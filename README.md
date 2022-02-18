@@ -1,4 +1,4 @@
-# @werker/router
+# @worker-tools/router
 Placeholder for a future routing solutions that works in worker environments like Cloudflare Workers.
 
 In the meantime, here are some alternatives:
