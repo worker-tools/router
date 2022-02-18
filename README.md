@@ -3,8 +3,11 @@ Placeholder for a future routing solutions that works in worker environments lik
 
 In the meantime, here are some alternatives:
 
+- [Itty Router](https://github.com/kwhitley/itty-router).
+  Appears to be the most worker-native router out there.
+
 - [Tiny Request Router](https://github.com/berstend/tiny-request-router).
-  Highly recommended. It might be a little too tiny for many usecases, but it is a good starting point.
+  Recommended. It might be a little too tiny for many usecases, but it is a good starting point.
   Fully typed!
   
 - [Workbox Routing](https://developers.google.com/web/tools/workbox/modules/workbox-routing).
