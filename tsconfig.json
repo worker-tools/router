@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2020", "WebWorker", "ESNext.AsyncIterable"],
+    "target": "ES2019",
+    "moduleResolution": "Node",
+    "outDir": ".",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "inlineSources": true,
+    "strict": true,
+  },
+  "include": [
+    "typings/*.d.ts",
+    "src/**/.ts",
+    "src/*.ts"
+  ],
+  "exclude": []
+}
