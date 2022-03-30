@@ -5,3 +5,7 @@ globalThis.Request = class FixedRequest extends Request {
     super(new URL(a, location.origin).href, b)
   }
 }
+
+Object.defineProperty(globalThis, 'tick', {
+  get: () => new Promise(r => setTimeout(r)),
+});

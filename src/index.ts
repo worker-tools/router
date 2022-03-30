@@ -3,6 +3,7 @@ import { URLPattern, URLPatternImpl } from './url-pattern';
 
 import { Context, EffectsList, executeEffects } from '@worker-tools/middleware';
 import { internalServerError, notFound } from '@worker-tools/response-creators';
+import { ok } from 'assert';
 
 export type Awaitable<T> = T | PromiseLike<T>;
 
@@ -37,10 +38,8 @@ export class WorkerRouter<RX extends Context = Context> {
       } catch (err) {
         if (err instanceof Response) {
           return err; // TODO: customization??
-        } else {
-          // TODO: throw err, logging ?????????????
-          return internalServerError();
-        }
+        } 
+        throw err;
       }
     }
     return notFound();
@@ -57,10 +56,6 @@ export class WorkerRouter<RX extends Context = Context> {
           groups: { '0': input.substring(pattern.pathname.length - 1) },
         }]
       }
-      // if (route.path === '/' && route.options.end === false) {
-      //   return { ...route, params: {} }
-      // }
-      // If method matches try to match path regexp
       
       const match = pattern.exec(url)
       if (!match) continue
@@ -124,30 +119,6 @@ export class WorkerRouter<RX extends Context = Context> {
     return this;
   }
 
-  /**
-   * Use a different `WorkerRouter` for the provided pattern. 
-   * The pattern must end in a wildcard `*` and the corresponding match is the only part used for matching in the `subRouter`.
-   * Forwards all HTTP methods and does not apply any middleware.
-   * 
-   * @param pathname A pattern ending in a wildcard, e.g. `/items*`
-   * @param subRouter A `WorkerRouter` that handles the remaining part of the URL
-   * @deprecated The name of this method might change 
-   */
-  use<Y extends Context>(pathname: string, subRouter: WorkerRouter<Y>): this {
-    // TODO: DEBUG??
-    if (!pathname.endsWith('*')) {  
-      console.warn('.use pattern must end with a wildcard (*)');
-      pathname += '*'
-    }
-    const pattern = new URLPatternImpl({ pathname })
-    this.#routes.push({
-      method: 'ALL',
-      pattern,
-      handler: subRouter.#routeHandler,
-    })
-    return this;
-  };
-
   /** Add a route that matches any method. */
   all<X extends RX>(path: string, handler: Handler<X>): this;
   all<X extends RX>(path: string, middleware: Middleware<RX, X>, handler: Handler<X>): this;
@@ -197,6 +168,43 @@ export class WorkerRouter<RX extends Context = Context> {
     return this.#registerRoute('OPTIONS', arguments.length, pathname, middlewareOrHandler, handler);
   }
 
+  /**
+   * Use a different `WorkerRouter` for the provided pattern. 
+   * 
+   * - The pattern must end in a wildcard `*` 
+   * - The corresponding match is the only part used for matching in the `subRouter`
+   * - Forwards all HTTP methods
+   * - Does not apply any middleware
+   * 
+   * #### Why does it not apply middleware?
+   * 
+   * There are 2 reasons: First, it interferes with type inference of middleware.
+   * As a developer you'd have to provide the correct types at the point of defining the sub router, 
+   * which is at least as cumbersome as providing the middleware itself.
+   * 
+   * Second, without this there would be no way to opt a route out of the router-level middleware. 
+   * For example you might want to opt out all `/public*` urls from cookie parsing, authentication, etc.
+   * but add a different caching policy instead.
+   * 
+   * @param pathname A pattern ending in a wildcard, e.g. `/items*`
+   * @param subRouter A `WorkerRouter` that handles the remaining part of the URL
+   * @deprecated The name of this method might change 
+   */
+  use<Y extends Context>(pathname: `${string}*`, subRouter: WorkerRouter<Y>): this {
+    // TODO: DEBUG??
+    if (!pathname.endsWith('*')) {  
+      console.warn('.use pattern must end with a wildcard (*)');
+      pathname += '*'
+    }
+    const pattern = new URLPatternImpl({ pathname })
+    this.#routes.push({
+      method: 'ALL',
+      pattern,
+      handler: subRouter.#routeHandler,
+    })
+    return this;
+  };
+
   get #routeHandler(): RouteHandler {
     return (ctx) => {
       // TODO: are these guaranteed to be ordered correctly??
@@ -210,7 +218,7 @@ export class WorkerRouter<RX extends Context = Context> {
     }
   }
 
-  private get handler(): Handler<Context> {
+  private get _handle(): Handler<Context> {
     return (request, ctx) => {
       return this.#match(request.url, { request, waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) })
     }

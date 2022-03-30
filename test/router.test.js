@@ -3,10 +3,6 @@ import { jest } from '@jest/globals'
 import { ok } from '@worker-tools/response-creators';
 import { WorkerRouter } from '../dist/router.js';
 
-Object.defineProperty(globalThis, 'tick', {
-  get: () => new Promise(r => setTimeout(r)),
-});
-
 test('environment', () => {
   expect(Request).toBeDefined();
   expect(Response).toBeDefined();
@@ -39,16 +35,16 @@ test('routes', async () => {
     .options('/item', optionsCallback)
     .head('/item', headCallback)
 
-  const { handler: route } = router;
-  route(new Request('/item'))
-  route(new Request('/item', { method: 'POST' }))
-  route(new Request('/item', { method: 'PUT' }))
-  route(new Request('/item', { method: 'PATCH' }))
-  route(new Request('/item', { method: 'DELETE' }))
-  route(new Request('/item', { method: 'OPTIONS' }))
-  route(new Request('/item', { method: 'HEAD' }))
-
-  await tick
+  const { _handle } = router;
+  const p = await Promise.all([
+    _handle(new Request('/item')),
+    _handle(new Request('/item', { method: 'POST' })),
+    _handle(new Request('/item', { method: 'PUT' })),
+    _handle(new Request('/item', { method: 'PATCH' })),
+    _handle(new Request('/item', { method: 'DELETE' })),
+    _handle(new Request('/item', { method: 'OPTIONS' })),
+    _handle(new Request('/item', { method: 'HEAD' })),
+  ]);
 
   expect(getCallback).toHaveBeenCalled()
   expect(postCallback).toHaveBeenCalled()
@@ -57,18 +53,20 @@ test('routes', async () => {
   expect(deleteCallback).toHaveBeenCalled()
   expect(optionsCallback).toHaveBeenCalled()
   expect(headCallback).toHaveBeenCalled()
+
+  return p
 })
 
-test('handler', () => {
+test('handle', () => {
   expect.hasAssertions();
   const router = new WorkerRouter().get('/', (req, ctx) => {
     expect(req).toBeInstanceOf(Request)
     expect(req.method).toBe('GET')
-    expect(req.url).toBe(new URL('/item', location.origin).href)
+    expect(req.url).toBe(new URL('/', location.origin).href)
     expect(ctx).toMatchObject({})
     return ok();
   })
-  router.handler(new Request('/'))
+  return router._handle(new Request('/'))
 })
 
 test('all methods', () => {
@@ -77,12 +75,14 @@ test('all methods', () => {
     expect(req).toBeInstanceOf(Request)
     return ok();
   })
-  router.handler(new Request('/', { method: 'POST' }))
-  router.handler(new Request('/', { method: 'PUT' }))
-  router.handler(new Request('/', { method: 'PATCH' }))
-  router.handler(new Request('/', { method: 'DELETE' }))
-  router.handler(new Request('/', { method: 'OPTIONS' }))
-  router.handler(new Request('/', { method: 'HEAD' }))
+  return Promise.all([
+    router._handle(new Request('/', { method: 'POST' })),
+    router._handle(new Request('/', { method: 'PUT' })),
+    router._handle(new Request('/', { method: 'PATCH' })),
+    router._handle(new Request('/', { method: 'DELETE' })),
+    router._handle(new Request('/', { method: 'OPTIONS' })),
+    router._handle(new Request('/', { method: 'HEAD' })),
+  ])
 })
 
 test('patterns', () => {
@@ -93,7 +93,7 @@ test('patterns', () => {
     expect(ctx.match.groups).toMatchObject({ id: '3' })
     return ok();
   })
-  router.handler(new Request('/item/3'))
+  return router._handle(new Request('/item/3'))
 })
 
 test('multi patterns', () => {
@@ -104,7 +104,7 @@ test('multi patterns', () => {
     expect(ctx.match.groups).toMatchObject({ type: 'soap', id: '3' })
     return ok();
   })
-  router.handler(new Request('/item/soap/3'))
+  return router._handle(new Request('/item/soap/3'))
 })
 
 test('wildcards *', () => {
@@ -115,7 +115,7 @@ test('wildcards *', () => {
     expect(ctx.match.groups).toMatchObject({ 0: '/item/soap/3' })
     return ok();
   })
-  router.handler(new Request('/item/soap/3'))
+  return router._handle(new Request('/item/soap/3'))
 })
 
 test('wildcards /*', () => {
@@ -124,7 +124,7 @@ test('wildcards /*', () => {
     expect(ctx.match.groups).toMatchObject({ 0: 'item/soap/3' })
     return ok();
   })
-  router.handler(new Request('/item/soap/3'))
+  return router._handle(new Request('/item/soap/3'))
 })
 
 test('ignores search params and hashes', () => {
@@ -133,29 +133,31 @@ test('ignores search params and hashes', () => {
     expect(ctx.match.groups['id']).toBe('3')
     return ok();
   })
-  router.handler(new Request('/item/soap/3?foo=bar#L2'))
+  return router._handle(new Request('/item/soap/3?foo=bar#L2'))
 })
 
 test('middleware', async () => {
   expect.assertions(2);
   const mw = jest.fn(x => ({ ...x, foo: 'bar' }))
   const router = new WorkerRouter().get('/', mw, (req, ctx) => {
-    console.log(ctx.foo)
-    expect(ctx.foo).toBe('barx') // dafuq??
+    expect(ctx.foo).toBe('bar')
   })
-  router.handler(new Request('/'))
+  const p = router._handle(new Request('/'))
   expect(mw).toHaveBeenCalled()
+  return p;
 })
 
 test('delegation', () => {
-  expect.hasAssertions();
+  expect.assertions(2)
   const itemRouter = new WorkerRouter()
     .get('/:type/:id', (req, ctx) => {
       expect(ctx.match.groups).toMatchObject({ type: 'soap', id: '3' })
     })
   const router = new WorkerRouter()
-    .use('/item*', itemRouter)
+    .use('/(item|sale)/*', itemRouter)
 
-  router.handler(new Request('/other/soap/3'))
-  router.handler(new Request('/item/soap/3'))
+  return Promise.all([
+    router._handle(new Request('/item/soap/3')),
+    router._handle(new Request('/sale/soap/3')),
+  ]);
 })
