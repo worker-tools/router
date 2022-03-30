@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "lib": ["ES2020", "WebWorker", "ESNext.AsyncIterable"],
-    "target": "ES2019",
+    "lib": ["ES2021", "WebWorker", "ESNext.AsyncIterable"],
+    "target": "ES2022",
     "moduleResolution": "Node",
     "outDir": ".",
     "declaration": true,
@@ -16,5 +16,7 @@
     "src/**/.ts",
     "src/*.ts"
   ],
-  "exclude": []
+  "exclude": [
+    "test"
+  ]
 }

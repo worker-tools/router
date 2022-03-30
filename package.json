@@ -1,9 +1,8 @@
 {
   "name": "@worker-tools/router",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "",
   "type": "module",
-  "main": "index.js",
   "module": "index.js",
   "types": "index.d.ts",
   "exports": {
@@ -18,9 +17,11 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rm -f *.d.ts *.js *.js.map *.d.ts.map",
-    "test": "jest",
+    "clean": "rm -rf *.d.ts index.js router.js url-pattern.js *.js.map *.d.ts.map dist",
+    "test": "npm run bundle && cp *.d.ts dist; node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "bundle": "esbuild src/index.ts --bundle --sourcemap --format=esm --target=esnext --outfile=dist/router.js",
     "build": "tsc -d",
+    "watch": "tsc -d -w",
     "prepack": "npm run clean && npm run build"
   },
   "author": "Florian Klampfer <mail@qwtel.com> (https://qwtel.com/)",
@@ -31,7 +32,13 @@
     "urlpattern-polyfill": "^1.0.0-rc5"
   },
   "devDependencies": {
+    "@types/jest": "^27.4.1",
     "@types/node": "^17.0.23",
+    "@worker-tools/location-polyfill": "workspace:^0.3.2-pre.1",
+    "esbuild": "^0.14.20",
+    "jest": "^27.5.1",
+    "jest-environment-miniflare": "^2.3.0",
+    "miniflare": "^2.3.0",
     "typescript": "^4.6.3"
   },
   "repository": {

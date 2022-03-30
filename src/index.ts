@@ -14,8 +14,7 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPT
 export type MethodWildcard = 'ALL';
 
 type RouteHandler = (x: Omit<Context, 'effects'>) => Awaitable<Response> 
-
-export interface Route {
+interface Route {
   method: Method | MethodWildcard
   pattern: URLPattern
   handler: RouteHandler
@@ -29,8 +28,8 @@ export class WorkerRouter<RX extends Context = Context> {
     this.#middleware = middleware;
   }
 
-  async #match(ctx: Omit<Context, 'effects' | 'match'>): Promise<Response> {
-    const result = this.#matchRoutes(ctx.request)
+  async #match(url: string, ctx: Omit<Context, 'effects' | 'match'>): Promise<Response> {
+    const result = this.#matchRoutes(url, ctx.request)
     if (result) {
       try {
         const [handler, match] = result;
@@ -47,16 +46,15 @@ export class WorkerRouter<RX extends Context = Context> {
     return notFound();
   }
 
-  #matchRoutes(request: Request): readonly [RouteHandler, URLPatternComponentResult] | null {
+  #matchRoutes(url: string, request: Request): readonly [RouteHandler, URLPatternComponentResult] | null {
     for (const { method, pattern, handler } of this.#routes) {
       // Skip immediately if method doesn't match
       if (method !== request.method.toUpperCase() && method !== 'ALL') continue
 
-      if (['*', '/*'].includes(pattern.pathname)) {
-        const url = new URL(request.url)
-        return [handler, {
-          input: url.pathname,
-          groups: { '0': url.pathname.substring(pattern.pathname.length - 1) },
+      if (pattern.pathname === '*' || pattern.pathname === '/*') {
+        const { pathname: input } = new URL(url)
+        return [handler, { input,
+          groups: { '0': input.substring(pattern.pathname.length - 1) },
         }]
       }
       // if (route.path === '/' && route.options.end === false) {
@@ -64,14 +62,14 @@ export class WorkerRouter<RX extends Context = Context> {
       // }
       // If method matches try to match path regexp
       
-      const match = pattern.exec(request.url)
+      const match = pattern.exec(url)
       if (!match) continue
       return [handler, match.pathname] as const
     }
     return null
   }
 
-  #pushBasicRoute(
+  #pushRoute(
     method: Method | MethodWildcard,
     pattern: URLPattern,
     handler: Handler<RX>,
@@ -88,7 +86,7 @@ export class WorkerRouter<RX extends Context = Context> {
     })
   }
 
-  #pushRoute<X extends RX>(
+  #pushMiddlewareRoute<X extends RX>(
     method: Method | MethodWildcard,
     pattern: URLPattern,
     middleware: Middleware<RX, X>,
@@ -114,24 +112,43 @@ export class WorkerRouter<RX extends Context = Context> {
     handler?: Handler<X>,
   ): this {
     const pattern = new URLPatternImpl({ pathname })
-    if (middlewareOrHandlerOrRouter instanceof WorkerRouter) {
-      // TODO: delegate to other router...
+    if (argsN === 2) {
+      const handler = middlewareOrHandlerOrRouter as Handler<RX>
+      this.#pushRoute(method, pattern, handler)
+    } else if (argsN === 3) {
+      const middleware = middlewareOrHandlerOrRouter as Middleware<RX, X>
+      this.#pushMiddlewareRoute(method, pattern, middleware, handler!)
     } else {
-      if (argsN === 2) {
-        const handler = middlewareOrHandlerOrRouter as Handler<RX>
-        this.#pushBasicRoute(method, pattern, handler)
-      } else if (argsN === 3) {
-        const middleware = middlewareOrHandlerOrRouter as Middleware<RX, X>
-        this.#pushRoute(method, pattern, middleware, handler!)
-      } else {
-        throw Error(`Router '${method.toLowerCase()}' called with invalid number of arguments`)
-      }
+      throw Error(`Router '${method.toLowerCase()}' called with invalid number of arguments`)
     }
     return this;
   }
 
+  /**
+   * Use a different `WorkerRouter` for the provided pattern. 
+   * The pattern must end in a wildcard `*` and the corresponding match is the only part used for matching in the `subRouter`.
+   * Forwards all HTTP methods and does not apply any middleware.
+   * 
+   * @param pathname A pattern ending in a wildcard, e.g. `/items*`
+   * @param subRouter A `WorkerRouter` that handles the remaining part of the URL
+   * @deprecated The name of this method might change 
+   */
+  use<Y extends Context>(pathname: string, subRouter: WorkerRouter<Y>): this {
+    // TODO: DEBUG??
+    if (!pathname.endsWith('*')) {  
+      console.warn('.use pattern must end with a wildcard (*)');
+      pathname += '*'
+    }
+    const pattern = new URLPatternImpl({ pathname })
+    this.#routes.push({
+      method: 'ALL',
+      pattern,
+      handler: subRouter.#routeHandler,
+    })
+    return this;
+  };
+
   /** Add a route that matches any method. */
-  // all<X extends RX>(path: string, router: WorkerRouter<X>): this;
   all<X extends RX>(path: string, handler: Handler<X>): this;
   all<X extends RX>(path: string, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   all<X extends RX>(path: string, middlewareOrHandlerOrRouter: Middleware<RX, X> | Handler<X> | WorkerRouter<X>, handler?: Handler<X>): this {
@@ -180,28 +197,41 @@ export class WorkerRouter<RX extends Context = Context> {
     return this.#registerRoute('OPTIONS', arguments.length, pathname, middlewareOrHandler, handler);
   }
 
-  // get handler(): Handler<RX> {
-  //   return (request, ctx) => {
-  //     return this.#match({ request, waitUntil: ctx.waitUntil.bind(ctx) })
-  //   }
-  // }
+  get #routeHandler(): RouteHandler {
+    return (ctx) => {
+      // TODO: are these guaranteed to be ordered correctly??
+      const values = Object.values(ctx.match.groups);
+      if (values.length) {
+        const baseURL = new URL(ctx.request.url).origin;
+        const subURL = new URL(values.at(-1)!, baseURL).href;
+        return this.#match(subURL, ctx);
+      }
+      throw Error('pattern not suitable for .use')
+    }
+  }
+
+  private get handler(): Handler<Context> {
+    return (request, ctx) => {
+      return this.#match(request.url, { request, waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) })
+    }
+  }
 
   get fetchEventCallback() {
     return (ev: FetchEvent) => {
-      ev.respondWith(this.#match({ request: ev.request, waitUntil: ev.waitUntil.bind(ev) }));
+      ev.respondWith(this.#match(ev.request.url, { request: ev.request, waitUntil: ev.waitUntil.bind(ev) }));
     }
   }
 
   get fetchModuleExport() {
     // TODO: do something about env?
     return async (request: Request, env: any, ctx: any): Promise<Response> => {
-      return this.#match({ request, env, waitUntil: ctx.waitUntil.bind(ctx) } as any);
+      return this.#match(request.url, { request, env, waitUntil: ctx.waitUntil.bind(ctx) } as any);
     }
   }
 
   get serveCallback() {
     return async (request: Request, connInfo: any): Promise<Response> => {
-      return this.#match({ request, connInfo, waitUntil: (_f: any) => {} } as any);
+      return this.#match(request.url, { request, connInfo, waitUntil: (_f: any) => {} } as any);
     }
   }
 }
