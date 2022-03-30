@@ -1,13 +1,14 @@
 import './fixes';
 import { jest } from '@jest/globals'
 import { ok } from '@worker-tools/response-creators';
-import { WorkerRouter } from '../dist/router.js';
+
+import { WorkerRouter } from '../dist/index.js';
 
 test('environment', () => {
   expect(Request).toBeDefined();
   expect(Response).toBeDefined();
-  expect(WorkerRouter).toBeDefined();
   expect(location).toBeDefined();
+  expect(WorkerRouter).toBeDefined();
 });
 
 test('request', () => {

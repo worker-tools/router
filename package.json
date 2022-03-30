@@ -17,9 +17,9 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rm -rf *.d.ts index.js router.js url-pattern.js *.js.map *.d.ts.map dist",
+    "clean": "rm -rf *.d.ts *.js *.js.map *.d.ts.map dist",
     "test": "npm run bundle && cp *.d.ts dist; node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "bundle": "esbuild src/index.ts --bundle --sourcemap --format=esm --target=esnext --outfile=dist/router.js",
+    "bundle": "esbuild src/index.ts --bundle --sourcemap --format=esm --target=esnext --outdir=dist",
     "build": "tsc -d",
     "watch": "tsc -d -w",
     "prepack": "npm run clean && npm run build"

@@ -208,7 +208,7 @@ export class WorkerRouter<RX extends Context = Context> {
   get #routeHandler(): RouteHandler {
     return (ctx) => {
       // TODO: are these guaranteed to be ordered correctly??
-      const values = Object.values(ctx.match.groups);
+      const values = Object.values(ctx.match?.groups ?? {});
       if (values.length) {
         const baseURL = new URL(ctx.request.url).origin;
         const subURL = new URL(values.at(-1)!, baseURL).href;
@@ -218,6 +218,9 @@ export class WorkerRouter<RX extends Context = Context> {
     }
   }
 
+  /**
+   * @deprecated Needs a better name
+   */
   private get _handle(): Handler<Context> {
     return (request, ctx) => {
       return this.#match(request.url, { request, waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) })
