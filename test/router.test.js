@@ -2,7 +2,7 @@ import './fixes';
 import { jest } from '@jest/globals'
 import { ok } from '@worker-tools/response-creators';
 
-import { WorkerRouter } from '../dist/index.js';
+import { WorkerRouter } from '../index.js';
 
 test('environment', () => {
   expect(Request).toBeDefined();
@@ -36,15 +36,14 @@ test('routes', async () => {
     .options('/item', optionsCallback)
     .head('/item', headCallback)
 
-  const { _handle } = router;
   const p = await Promise.all([
-    _handle(new Request('/item')),
-    _handle(new Request('/item', { method: 'POST' })),
-    _handle(new Request('/item', { method: 'PUT' })),
-    _handle(new Request('/item', { method: 'PATCH' })),
-    _handle(new Request('/item', { method: 'DELETE' })),
-    _handle(new Request('/item', { method: 'OPTIONS' })),
-    _handle(new Request('/item', { method: 'HEAD' })),
+    router._handle(new Request('/item')),
+    router._handle(new Request('/item', { method: 'POST' })),
+    router._handle(new Request('/item', { method: 'PUT' })),
+    router._handle(new Request('/item', { method: 'PATCH' })),
+    router._handle(new Request('/item', { method: 'DELETE' })),
+    router._handle(new Request('/item', { method: 'OPTIONS' })),
+    router._handle(new Request('/item', { method: 'HEAD' })),
   ]);
 
   expect(getCallback).toHaveBeenCalled()
@@ -90,8 +89,8 @@ test('patterns', () => {
   expect.assertions(3)
   const router = new WorkerRouter().get('/item/:id', (req, ctx) => {
     expect(ctx.match).toBeDefined()
-    expect(ctx.match.input).toBe('/item/3')
-    expect(ctx.match.groups).toMatchObject({ id: '3' })
+    expect(ctx.match.pathname.input).toBe('/item/3')
+    expect(ctx.match.pathname.groups).toMatchObject({ id: '3' })
     return ok();
   })
   return router._handle(new Request('/item/3'))
@@ -101,8 +100,8 @@ test('multi patterns', () => {
   expect.assertions(3)
   const router = new WorkerRouter().get('/item/:type/:id', (req, ctx) => {
     expect(ctx.match).toBeDefined()
-    expect(ctx.match.input).toBe('/item/soap/3')
-    expect(ctx.match.groups).toMatchObject({ type: 'soap', id: '3' })
+    expect(ctx.match.pathname.input).toBe('/item/soap/3')
+    expect(ctx.match.pathname.groups).toMatchObject({ type: 'soap', id: '3' })
     return ok();
   })
   return router._handle(new Request('/item/soap/3'))
@@ -112,8 +111,8 @@ test('wildcards *', () => {
   expect.assertions(3)
   const router = new WorkerRouter().get('*', (req, ctx) => {
     expect(ctx.match).toBeDefined()
-    expect(ctx.match.input).toBe('/item/soap/3')
-    expect(ctx.match.groups).toMatchObject({ 0: '/item/soap/3' })
+    expect(ctx.match.pathname.input).toBe('/item/soap/3')
+    expect(ctx.match.pathname.groups).toMatchObject({ 0: '/item/soap/3' })
     return ok();
   })
   return router._handle(new Request('/item/soap/3'))
@@ -122,7 +121,7 @@ test('wildcards *', () => {
 test('wildcards /*', () => {
   expect.assertions(1);
   const router = new WorkerRouter().get('/*', (req, ctx) => {
-    expect(ctx.match.groups).toMatchObject({ 0: 'item/soap/3' })
+    expect(ctx.match.pathname.groups).toMatchObject({ 0: 'item/soap/3' })
     return ok();
   })
   return router._handle(new Request('/item/soap/3'))
@@ -131,7 +130,7 @@ test('wildcards /*', () => {
 test('ignores search params and hashes', () => {
   expect.assertions(1);
   const router = new WorkerRouter().get('/item/soap/:id', (req, ctx) => {
-    expect(ctx.match.groups['id']).toBe('3')
+    expect(ctx.match.pathname.groups['id']).toBe('3')
     return ok();
   })
   return router._handle(new Request('/item/soap/3?foo=bar#L2'))
@@ -150,10 +149,12 @@ test('middleware', async () => {
 
 test('delegation', () => {
   expect.assertions(2)
+
   const itemRouter = new WorkerRouter()
     .get('/:type/:id', (req, ctx) => {
-      expect(ctx.match.groups).toMatchObject({ type: 'soap', id: '3' })
+      expect(ctx.match.pathname.groups).toMatchObject({ type: 'soap', id: '3' })
     })
+
   const router = new WorkerRouter()
     .use('/(item|sale)/*', itemRouter)
 
@@ -161,4 +162,45 @@ test('delegation', () => {
     router._handle(new Request('/item/soap/3')),
     router._handle(new Request('/sale/soap/3')),
   ]);
+})
+
+test('external resources', async () => {
+  const callback = jest.fn(() => ok())
+
+  const router = new WorkerRouter()
+    .external('https://exmaple.com/*', callback)
+
+  await Promise.all([
+    router._handle(new Request('https://exmaple.com/api/call')),
+    router._handle(new Request('https://exmaple.com/other/resource')),
+    router._handle(new Request('https://exmaple.com/')),
+    router._handle(new Request('https://exmaple.com')),
+  ])
+
+  expect(callback).toHaveBeenCalledTimes(4)
+})
+
+test('pattern init', async () => {
+  const callback = jest.fn(() => ok())
+
+  const router = new WorkerRouter()
+    .external({ pathname: '/api/*', baseURL: 'https://example.com' }, callback)
+
+  await router._handle(new Request('https://example.com/api/call'))
+
+  expect(callback).toHaveBeenCalled()
+})
+
+test('external resources don\'t match same pathname (iff global location is present)', async () => {
+  const callback = jest.fn(() => ok())
+  const realCallback = jest.fn(() => ok())
+
+  const router = new WorkerRouter()
+    .all('/same', callback)
+    .external({ pathname: '/same' }, realCallback)
+
+  await router._handle(new Request('https://exmaple.com/same'))
+
+  expect(callback).not.toHaveBeenCalled()
+  expect(realCallback).toHaveBeenCalled()
 })
