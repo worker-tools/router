@@ -129,7 +129,6 @@ export class WorkerRouter<RX extends Context = Context> {
     middlewareOrHandlerOrRouter: Middleware<RX, X> | Handler<X> | WorkerRouter<X>,
     handler?: Handler<X>,
   ): this {
-    console.log(pattern)
     if (argsN === 2) {
       const handler = middlewareOrHandlerOrRouter as Handler<RX>
       this.#pushRoute(method, pattern, handler)

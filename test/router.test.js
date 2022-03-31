@@ -1,8 +1,9 @@
 import './fixes';
 import { jest } from '@jest/globals'
 import { ok } from '@worker-tools/response-creators';
+import { ResolvablePromise } from '@worker-tools/resolvable-promise';
 
-import { WorkerRouter } from '../index.js';
+import { WorkerRouter } from '../dist/index.js';
 
 test('environment', () => {
   expect(Request).toBeDefined();
@@ -203,4 +204,47 @@ test('external resources don\'t match same pathname (iff global location is pres
 
   expect(callback).not.toHaveBeenCalled()
   expect(realCallback).toHaveBeenCalled()
+})
+
+test('fetch event listener', async () => {
+  const rp = new ResolvablePromise()
+  const theResponse = ok();
+  const callback = jest.fn(() => theResponse)
+  const router = new WorkerRouter()
+    .any('*', callback)
+
+  router.fetchEventListener(new class extends Event {
+    constructor() {
+      super('fetch')
+      this.request = new Request('/')
+    }
+    respondWith(response) {
+      rp.resolve(response)
+    }
+    waitUntil() {}
+  })
+  expect(await rp).toBe(theResponse);
+  expect(callback).toHaveBeenCalled()
+})
+
+test('module fetch export', async () => {
+  const envEnv = {}
+  const envCtx = { waitUntil() {} }
+  const theResponse = ok();
+  const router = new WorkerRouter()
+    .any('*', (req, { env, waitUntil }) => {
+      expect(waitUntil).toBeDefined()
+      expect(env).toBe(envEnv)
+      return theResponse;
+    })
+  expect(await router.fetchExport(new Request('/'), envEnv, envCtx)).toBe(theResponse)
+})
+
+test('serve callback', async () => {
+  const theResponse = ok();
+  const callback = jest.fn(() => theResponse)
+  const router = new WorkerRouter()
+    .any('*', callback)
+  expect(await router.serveCallback(new Request('/'), {})).toBe(theResponse)
+  expect(callback).toHaveBeenCalled
 })
