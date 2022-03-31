@@ -86,3 +86,9 @@ To use it with Deno/Deploy's `serve` function, use
 ```js
 serve(router.serveCallback)
 ```
+
+## TODO
+How to handle errors in middleware? 
+How to forward failure states like failed content negotiation? 
+How to let appdevs provide customized error pages for the above?
+Add support for nonstandard http methods?

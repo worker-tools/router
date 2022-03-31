@@ -176,6 +176,9 @@ test('external resources', async () => {
     router._handle(new Request('https://exmaple.com/other/resource')),
     router._handle(new Request('https://exmaple.com/')),
     router._handle(new Request('https://exmaple.com')),
+
+    router._handle(new Request('https://not.example.com/foo/bar')),
+    router._handle(new Request('/api/call')),
   ])
 
   expect(callback).toHaveBeenCalledTimes(4)
