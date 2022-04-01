@@ -27,7 +27,7 @@
   "author": "Florian Klampfer <mail@qwtel.com> (https://qwtel.com/)",
   "license": "MIT",
   "dependencies": {
-    "@worker-tools/middleware": "^0.1.0-pre.0",
+    "@worker-tools/middleware": "^0.1.0-pre.2",
     "@worker-tools/response-creators": "^1.0.8",
     "urlpattern-polyfill": "^1.0.0-rc5"
   },
