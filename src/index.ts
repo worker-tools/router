@@ -49,8 +49,8 @@ export class WorkerRouter<RX extends Context = Context> {
     this.#middleware = middleware;
   }
 
-  async #route(url: string, ctx: Omit<Context, 'effects' | 'match'>): Promise<Response> {
-    const result = this.#execPatterns(url, ctx.request)
+  async #route(fqURL: string, ctx: Context): Promise<Response> {
+    const result = this.#execPatterns(fqURL, ctx.request)
     if (result) {
       try {
         const [handler, match] = result;
@@ -67,7 +67,7 @@ export class WorkerRouter<RX extends Context = Context> {
     return notFound();
   }
 
-  #execPatterns(url: string, request: Request): readonly [RouteHandler, URLPatternResult] | null {
+  #execPatterns(fqURL: string, request: Request): readonly [RouteHandler, URLPatternResult] | null {
     for (const { method, pattern, handler } of this.#routes) {
       if (method !== 'ANY' && method !== request.method.toUpperCase()) continue
 
@@ -81,7 +81,7 @@ export class WorkerRouter<RX extends Context = Context> {
       //   return [handler, { ...anyPathResult, pathname: { input, groups: { '0': input.substring(1) } } }]
       // }
       
-      const match = pattern.exec(url);
+      const match = pattern.exec(fqURL);
       if (!match) continue
 
       return [handler, match] as const;
@@ -100,7 +100,7 @@ export class WorkerRouter<RX extends Context = Context> {
       handler: async event => {
         const ctx = await this.#middleware(event);
         const response = handler(event.request, ctx);
-        return executeEffects(event.effects, response)
+        return executeEffects(event.effects!, response)
       },
     })
   }
@@ -117,7 +117,7 @@ export class WorkerRouter<RX extends Context = Context> {
       handler: async event => {
         const ctx = await middleware(this.#middleware(event))
         const response = handler(event.request, ctx);
-        return executeEffects(event.effects, response)
+        return executeEffects(event.effects!, response)
       },
     })
   }
@@ -338,11 +338,13 @@ export class WorkerRouter<RX extends Context = Context> {
     }
   }
 
-  /** @deprecated Needs a better name */
-  get _handle(): Handler<Context> {
-    return (request, ctx) => {
-      return this.#route(request.url, { request, waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) })
-    }
+  /** @deprecated Name/API might change */
+  handle: Handler<Context> = (request, ctx) => {
+    return this.#route(request.url, { 
+      ...ctx,
+      request, 
+      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) 
+    })
   }
 
   /**

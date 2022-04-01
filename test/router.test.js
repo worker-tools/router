@@ -38,13 +38,13 @@ test('routes', async () => {
     .head('/item', headCallback)
 
   const p = await Promise.all([
-    router._handle(new Request('/item')),
-    router._handle(new Request('/item', { method: 'POST' })),
-    router._handle(new Request('/item', { method: 'PUT' })),
-    router._handle(new Request('/item', { method: 'PATCH' })),
-    router._handle(new Request('/item', { method: 'DELETE' })),
-    router._handle(new Request('/item', { method: 'OPTIONS' })),
-    router._handle(new Request('/item', { method: 'HEAD' })),
+    router.handle(new Request('/item')),
+    router.handle(new Request('/item', { method: 'POST' })),
+    router.handle(new Request('/item', { method: 'PUT' })),
+    router.handle(new Request('/item', { method: 'PATCH' })),
+    router.handle(new Request('/item', { method: 'DELETE' })),
+    router.handle(new Request('/item', { method: 'OPTIONS' })),
+    router.handle(new Request('/item', { method: 'HEAD' })),
   ]);
 
   expect(getCallback).toHaveBeenCalled()
@@ -67,7 +67,7 @@ test('handle', () => {
     expect(ctx).toMatchObject({})
     return ok();
   })
-  return router._handle(new Request('/'))
+  return router.handle(new Request('/'))
 })
 
 test('all methods', () => {
@@ -77,12 +77,12 @@ test('all methods', () => {
     return ok();
   })
   return Promise.all([
-    router._handle(new Request('/', { method: 'POST' })),
-    router._handle(new Request('/', { method: 'PUT' })),
-    router._handle(new Request('/', { method: 'PATCH' })),
-    router._handle(new Request('/', { method: 'DELETE' })),
-    router._handle(new Request('/', { method: 'OPTIONS' })),
-    router._handle(new Request('/', { method: 'HEAD' })),
+    router.handle(new Request('/', { method: 'POST' })),
+    router.handle(new Request('/', { method: 'PUT' })),
+    router.handle(new Request('/', { method: 'PATCH' })),
+    router.handle(new Request('/', { method: 'DELETE' })),
+    router.handle(new Request('/', { method: 'OPTIONS' })),
+    router.handle(new Request('/', { method: 'HEAD' })),
   ])
 })
 
@@ -94,7 +94,7 @@ test('patterns', () => {
     expect(ctx.match.pathname.groups).toMatchObject({ id: '3' })
     return ok();
   })
-  return router._handle(new Request('/item/3'))
+  return router.handle(new Request('/item/3'))
 })
 
 test('multi patterns', () => {
@@ -105,7 +105,7 @@ test('multi patterns', () => {
     expect(ctx.match.pathname.groups).toMatchObject({ type: 'soap', id: '3' })
     return ok();
   })
-  return router._handle(new Request('/item/soap/3'))
+  return router.handle(new Request('/item/soap/3'))
 })
 
 test('wildcards *', () => {
@@ -116,7 +116,7 @@ test('wildcards *', () => {
     expect(ctx.match.pathname.groups).toMatchObject({ 0: '/item/soap/3' })
     return ok();
   })
-  return router._handle(new Request('/item/soap/3'))
+  return router.handle(new Request('/item/soap/3'))
 })
 
 test('wildcards /*', () => {
@@ -125,7 +125,7 @@ test('wildcards /*', () => {
     expect(ctx.match.pathname.groups).toMatchObject({ 0: 'item/soap/3' })
     return ok();
   })
-  return router._handle(new Request('/item/soap/3'))
+  return router.handle(new Request('/item/soap/3'))
 })
 
 test('ignores search params and hashes', () => {
@@ -134,7 +134,7 @@ test('ignores search params and hashes', () => {
     expect(ctx.match.pathname.groups['id']).toBe('3')
     return ok();
   })
-  return router._handle(new Request('/item/soap/3?foo=bar#L2'))
+  return router.handle(new Request('/item/soap/3?foo=bar#L2'))
 })
 
 test('middleware', async () => {
@@ -143,7 +143,7 @@ test('middleware', async () => {
   const router = new WorkerRouter().get('/', mw, (req, ctx) => {
     expect(ctx.foo).toBe('bar')
   })
-  const p = router._handle(new Request('/'))
+  const p = router.handle(new Request('/'))
   expect(mw).toHaveBeenCalled()
   return p;
 })
@@ -160,8 +160,8 @@ test('delegation', () => {
     .use('/(item|sale)/*', itemRouter)
 
   return Promise.all([
-    router._handle(new Request('/item/soap/3')),
-    router._handle(new Request('/sale/soap/3')),
+    router.handle(new Request('/item/soap/3')),
+    router.handle(new Request('/sale/soap/3')),
   ]);
 })
 
@@ -172,13 +172,13 @@ test('external resources', async () => {
     .external('https://exmaple.com/*', callback)
 
   await Promise.all([
-    router._handle(new Request('https://exmaple.com/api/call')),
-    router._handle(new Request('https://exmaple.com/other/resource')),
-    router._handle(new Request('https://exmaple.com/')),
-    router._handle(new Request('https://exmaple.com')),
+    router.handle(new Request('https://exmaple.com/api/call')),
+    router.handle(new Request('https://exmaple.com/other/resource')),
+    router.handle(new Request('https://exmaple.com/')),
+    router.handle(new Request('https://exmaple.com')),
 
-    router._handle(new Request('https://not.example.com/foo/bar')),
-    router._handle(new Request('/api/call')),
+    router.handle(new Request('https://not.example.com/foo/bar')),
+    router.handle(new Request('/api/call')),
   ])
 
   expect(callback).toHaveBeenCalledTimes(4)
@@ -190,7 +190,7 @@ test('pattern init', async () => {
   const router = new WorkerRouter()
     .external({ pathname: '/api/*', baseURL: 'https://example.com' }, callback)
 
-  await router._handle(new Request('https://example.com/api/call'))
+  await router.handle(new Request('https://example.com/api/call'))
 
   expect(callback).toHaveBeenCalled()
 })
@@ -203,7 +203,7 @@ test('external resources don\'t match same pathname (iff global location is pres
     .all('/same', callback)
     .external({ pathname: '/same' }, realCallback)
 
-  await router._handle(new Request('https://exmaple.com/same'))
+  await router.handle(new Request('https://exmaple.com/same'))
 
   expect(callback).not.toHaveBeenCalled()
   expect(realCallback).toHaveBeenCalled()

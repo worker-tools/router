@@ -34,9 +34,9 @@
   "devDependencies": {
     "@types/jest": "^27.4.1",
     "@types/node": "^17.0.23",
-    "@worker-tools/location-polyfill": "^0.3.2-pre.1",
+    "@worker-tools/location-polyfill": "^0.4.0",
     "@worker-tools/resolvable-promise": "^0.1.1",
-    "esbuild": "^0.14.20",
+    "esbuild": "^0.14.29",
     "jest": "^27.5.1",
     "jest-environment-miniflare": "^2.3.0",
     "miniflare": "^2.3.0",
