@@ -216,7 +216,7 @@ test('fetch event listener', async () => {
   const router = new WorkerRouter()
     .any('*', callback)
 
-  router.fetchEventListener(new class extends Event {
+  router.handleEvent(new class extends Event {
     constructor() {
       super('fetch')
       this.request = new Request('/')
@@ -240,7 +240,7 @@ test('module fetch export', async () => {
       expect(env).toBe(envEnv)
       return theResponse;
     })
-  expect(await router.fetchExport(new Request('/'), envEnv, envCtx)).toBe(theResponse)
+  expect(await router.fetch(new Request('/'), envEnv, envCtx)).toBe(theResponse)
 })
 
 test('serve callback', async () => {

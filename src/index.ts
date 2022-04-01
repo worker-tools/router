@@ -324,18 +324,16 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
     return this;
   }
 
-  get #routeHandler(): RouteHandler {
-    return (ctx) => {
-      // TODO: are these guaranteed to be ordered correctly??
-      const values = Object.values(ctx.match?.pathname.groups ?? {});
-      if (values.length) {
-        // TODO: does this work as expected with external patterns?
-        const baseURL = new URL(ctx.request.url).origin;
-        const subURL = new URL(values.at(-1)!, baseURL);
-        return this.#route(subURL.href, ctx);
-      }
-      throw Error('pattern not suitable for .use')
+  #routeHandler: RouteHandler = (ctx) => {
+    // TODO: are these guaranteed to be ordered correctly??
+    const values = Object.values(ctx.match?.pathname.groups ?? {});
+    if (values.length) {
+      // TODO: does this work as expected with external patterns?
+      const baseURL = new URL(ctx.request.url).origin;
+      const subURL = new URL(values.at(-1)!, baseURL);
+      return this.#route(subURL.href, ctx);
     }
+    throw Error('pattern not suitable for .use')
   }
 
   /** @deprecated Name/API might change */
@@ -348,25 +346,30 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   }
 
   /**
-   * Implement the (ancient) event listener object interface to allow passing to fetch event directly,
+   * Implements the (ancient) event listener object interface to allow passing to fetch event directly,
    * e.g. `self.addEventListener('fetch', router)`.
    */
-  handleEvent(object: Event) {
+  handleEvent = (object: Event) => {
     const event = object as FetchEvent;
     event.respondWith(this.#route(event.request.url, { 
-      event,
       request: event.request, 
       waitUntil: event.waitUntil.bind(event), 
+      event,
     }));
   };
 
   /**
    * Callback compatible with Cloudflare Worker's `fetch` module export.
-   * E.g. `export { fetch: router.fetchExport }`.
+   * E.g. `export default router`.
    */
     // TODO: Add env to context?
-  fetchExport = async (request: Request, env: any, ctx: any): Promise<Response> => {
-    return this.#route(request.url, { request, waitUntil: ctx.waitUntil.bind(ctx), env, ctx });
+  fetch = async (request: Request, env?: any, ctx?: any): Promise<Response> => {
+    return this.#route(request.url, { 
+      request, 
+      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}), 
+      env, 
+      ctx,
+    });
   }
 
   /**
@@ -376,18 +379,4 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   serveCallback = async (request: Request, connInfo: any): Promise<Response> => {
     return this.#route(request.url, { request, waitUntil: (_f: any) => {}, connInfo });
   }
-
-  /**
-   * A event listener that is compatible with the global fetch event. 
-   * E.g. `self.addEventListener('fetch', router)`.
-   * @deprecated use `handleEvent` instead if possible.
-   */
-  fetchEventListener = (event: FetchEvent) => {
-    event.respondWith(this.#route(event.request.url, { 
-      event,
-      request: event.request, 
-      waitUntil: event.waitUntil.bind(event), 
-    }));
-  }
 }
-
