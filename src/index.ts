@@ -141,7 +141,7 @@ export class WorkerRouter<RX extends Context = Context> {
     return this;
   }
 
-  /** Add a route that matches *any* method. */
+  /** Add a route that matches *any* HTTP method. */
   any<X extends RX>(path: string, handler: Handler<X>): this;
   any<X extends RX>(path: string, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   any<X extends RX>(path: string, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
@@ -198,7 +198,7 @@ export class WorkerRouter<RX extends Context = Context> {
 
   /** 
    * Add a route that matches *any* method with the provided pattern. 
-   * Note that `init` here is interpreted as a `URLPatternInit` which has important implication regarding matching. 
+   * Note that the pattern here is interpreted as a `URLPatternInit` which has important implication for matching. 
    * Mostly, this is for use in Service Workers to intercept requests to external resources.
    * 
    * The name `external` is a bit of a misnomer. It simply allows specifying arbitrary `URLPatterns`
@@ -349,7 +349,7 @@ export class WorkerRouter<RX extends Context = Context> {
    * A listener that is compatible with the global fetch event. 
    * E.g. `self.addEventListener('fetch', router.fetchEventListener)`.
    */
-  fetchEventListener(event: FetchEvent) {
+  fetchEventListener = (event: FetchEvent) => {
     event.respondWith(this.#route(event.request.url, { 
       event,
       request: event.request, 
@@ -361,21 +361,16 @@ export class WorkerRouter<RX extends Context = Context> {
    * Callback compatible with Cloudflare Worker's `fetch` module export.
    * E.g. `export { fetch: router.fetchExport }`.
    */
-  get fetchExport() {
     // TODO: Add env to context?
-    return async (request: Request, env: any, ctx: any): Promise<Response> => {
-      return this.#route(request.url, { request, env, waitUntil: ctx.waitUntil.bind(ctx) } as any);
-    }
+  fetchExport = async (request: Request, env: any, ctx: any): Promise<Response> => {
+    return this.#route(request.url, { request, waitUntil: ctx.waitUntil.bind(ctx), env, ctx });
   }
 
   /**
    * Callback that is compatible with Deno's `serve` function.
    * E.g. `serve(router.serveCallback)`.
    */
-  get serveCallback() {
-    // TODO: Add connInfo to context?
-    return async (request: Request, connInfo: any): Promise<Response> => {
-      return this.#route(request.url, { request, connInfo, waitUntil: (_f: any) => {} } as any);
-    }
+  serveCallback = async (request: Request, connInfo: any): Promise<Response> => {
+    return this.#route(request.url, { request, waitUntil: (_f: any) => {}, connInfo });
   }
 }
