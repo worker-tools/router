@@ -41,7 +41,7 @@ function toPattern(pathname: string) {
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
 // const anyPathResult = Object.freeze(toPattern('/*').exec(new Request('/').url)!);
 
-export class WorkerRouter<RX extends Context = Context> {
+export class WorkerRouter<RX extends Context = Context> implements EventListenerObject {
   #middleware: BaseMiddleware<RX>
   #routes: Route[] = [];
 
@@ -348,16 +348,17 @@ export class WorkerRouter<RX extends Context = Context> {
   }
 
   /**
-   * A listener that is compatible with the global fetch event. 
-   * E.g. `self.addEventListener('fetch', router.fetchEventListener)`.
+   * Implement the (ancient) event listener object interface to allow passing to fetch event directly,
+   * e.g. `self.addEventListener('fetch', router)`.
    */
-  fetchEventListener = (event: FetchEvent) => {
+  handleEvent(object: Event) {
+    const event = object as FetchEvent;
     event.respondWith(this.#route(event.request.url, { 
       event,
       request: event.request, 
       waitUntil: event.waitUntil.bind(event), 
     }));
-  }
+  };
 
   /**
    * Callback compatible with Cloudflare Worker's `fetch` module export.
@@ -375,4 +376,18 @@ export class WorkerRouter<RX extends Context = Context> {
   serveCallback = async (request: Request, connInfo: any): Promise<Response> => {
     return this.#route(request.url, { request, waitUntil: (_f: any) => {}, connInfo });
   }
+
+  /**
+   * A event listener that is compatible with the global fetch event. 
+   * E.g. `self.addEventListener('fetch', router)`.
+   * @deprecated use `handleEvent` instead if possible.
+   */
+  fetchEventListener = (event: FetchEvent) => {
+    event.respondWith(this.#route(event.request.url, { 
+      event,
+      request: event.request, 
+      waitUntil: event.waitUntil.bind(event), 
+    }));
+  }
 }
+

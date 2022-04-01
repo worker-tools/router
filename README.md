@@ -70,8 +70,10 @@ Worker Router comes with out of the box support for a variety of Worker Environm
 To use it in an environment that provides a global `fetch` event, use
 
 ```js
-self.addEventListener('fetch', router.fetchEventListener)
+self.addEventListener('fetch', router)
 ```
+
+(This works because the router implements the [`EventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventListener) interface)
 
 To use it with Cloudflare's module workers, use
 
