@@ -201,7 +201,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
    * Note that the pattern here is interpreted as a `URLPatternInit` which has important implication for matching. 
    * Mostly, this is for use in Service Workers to intercept requests to external resources.
    * 
-   * The name `external` is a bit of a misnomer. It simply allows specifying arbitrary `URLPatterns`
+   * The name `external` is a bit of a misnomer. It simply forwards `init` to the `URLPattern` constructor,
    * instead of being limited to the `pathname` property in the general case.
    * @deprecated Might change name/API
    */
@@ -328,12 +328,11 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
     // TODO: are these guaranteed to be ordered correctly??
     const values = Object.values(ctx.match?.pathname.groups ?? {});
     if (values.length) {
-      // TODO: does this work as expected with external patterns?
       const baseURL = new URL(ctx.request.url).origin;
       const subURL = new URL(values.at(-1)!, baseURL);
       return this.#route(subURL.href, ctx);
     }
-    throw Error('pattern not suitable for .use')
+    throw Error('Pattern not suitable for nested routing. Did you forget to add a wildcard (*)?')
   }
 
   /** @deprecated Name/API might change */
@@ -362,7 +361,6 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
    * Callback compatible with Cloudflare Worker's `fetch` module export.
    * E.g. `export default router`.
    */
-    // TODO: Add env to context?
   fetch = async (request: Request, env?: any, ctx?: any): Promise<Response> => {
     return this.#route(request.url, { 
       request, 

@@ -1,12 +1,12 @@
 # Worker Router
-A router for [Worker Environments](https://workers.js.org) such as Cloudflare Workers or Service Workers.
+A router for [Worker Environments](https://workers.js.org) such and Cloudflare Workers or Service Workers.
 
 This router is inspired by previous work such as `tiny-request-router` and `itty-router`, but it
 improves on them by providing better support for middleware, type inference, nested routing, and broader URL matching for use in service workers.
 
 ## Type Inference 🆓
-The goal of Worker Router is to infer types based on usage so that no explicit typing is required for standard use cases.
-This allows even non-TypeScript users to benefit from inline documentation and API discoverability:
+The goal of Worker Router is to *infer types based on usage* so that **no explicit typing** is required for standard use cases.
+This allows even JavaScript users to benefit from inline documentation and API discoverability:
 
 ```js
 import { WorkersRouter } from '@worker-tools/router'
