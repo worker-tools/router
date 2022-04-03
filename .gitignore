@@ -1,8 +1,1 @@
-node_modules
-cjs
-/*.js
-!*.config.js
-/*.js.map
-/test/*.map
-/*.d.ts*
-dist
+/npm

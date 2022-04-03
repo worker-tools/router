@@ -1,24 +1,28 @@
-import { URLPatternInit, URLPatternResult } from 'urlpattern-polyfill/dist/url-pattern.interfaces';
-import type { URLPattern } from './url-pattern';
-import { URLPatternImpl } from './url-pattern';
-
-import { Context, EffectsList, executeEffects } from '@worker-tools/middleware';
-import { internalServerError, notFound } from '@worker-tools/response-creators';
+import { Context, EffectsList, executeEffects } from '../middleware/index.ts';
+import { internalServerError, notFound } from '../response-creators/index.ts';
 
 export type Awaitable<T> = T | PromiseLike<T>;
 
-export type BaseMiddleware<X extends Context> = (x: Awaitable<Context>) => Awaitable<X>
-export type Middleware<RX extends Context, X extends Context> = (x: Awaitable<RX>) => Awaitable<X>
-export type Handler<X extends Context> = (request: Request, ctx: X) => Awaitable<Response>;
+export interface MatchContext extends Context {
+  match: URLPatternResult
+}
+
+export type BaseMiddleware<X extends MatchContext> = (x: Awaitable<MatchContext>) => Awaitable<X>
+export type Middleware<RX extends MatchContext, X extends MatchContext> = (x: Awaitable<RX>) => Awaitable<X>
+export type Handler<X extends MatchContext> = (request: Request, ctx: X) => Awaitable<Response>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 type MethodWildcard = 'ANY';
 
-type RouteHandler = (x: Context) => Awaitable<Response> 
+type RouteHandler = (x: MatchContext) => Awaitable<Response> 
 interface Route {
   method: Method | MethodWildcard
   pattern: URLPattern
   handler: RouteHandler
+}
+
+if (!('URLPattern' in globalThis)) {
+  await import(/* webpackMode: "eager" */ 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js')
 }
 
 /** 
@@ -29,7 +33,7 @@ interface Route {
  * this is essentially a noop since only matching requests can reach deployed workers in the first place.
  */
 function toPattern(pathname: string) {
-  const pattern = new URLPatternImpl({ 
+  const pattern = new URLPattern({ 
     pathname, 
     protocol: globalThis.location?.protocol,
     hostname: globalThis.location?.hostname,
@@ -41,7 +45,7 @@ function toPattern(pathname: string) {
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
 // const anyPathResult = Object.freeze(toPattern('/*').exec(new Request('/').url)!);
 
-export class WorkerRouter<RX extends Context = Context> implements EventListenerObject {
+export class WorkerRouter<RX extends MatchContext = MatchContext> implements EventListenerObject {
   #middleware: BaseMiddleware<RX>
   #routes: Route[] = [];
 
@@ -49,7 +53,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
     this.#middleware = middleware;
   }
 
-  async #route(fqURL: string, ctx: Context): Promise<Response> {
+  async #route(fqURL: string, ctx: Omit<Context, 'effects'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
     if (result) {
       try {
@@ -208,7 +212,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   external<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   external<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   external<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('ANY', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('ANY', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `GET` 
@@ -216,7 +220,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalGET<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalGET<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalGET<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('GET', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('GET', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `POST` 
@@ -224,7 +228,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalPOST<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalPOST<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalPOST<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('POST', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('POST', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `PUT` 
@@ -232,7 +236,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalPUT<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalPUT<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalPUT<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('PUT', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('PUT', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `PATCH` 
@@ -240,7 +244,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalPATCH<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalPATCH<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalPATCH<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('PATCH', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('PATCH', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `DELETE` 
@@ -248,7 +252,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalDELETE<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalDELETE<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalDELETE<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('DELETE', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('DELETE', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `OPTIONS` 
@@ -256,7 +260,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalOPTIONS<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalOPTIONS<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalOPTIONS<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('OPTIONS', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('OPTIONS', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /** Like `.external`, but only matches `HEAD` 
@@ -264,7 +268,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   externalHEAD<X extends RX>(init: string | URLPatternInit, handler: Handler<X>): this;
   externalHEAD<X extends RX>(init: string | URLPatternInit, middleware: Middleware<RX, X>, handler: Handler<X>): this;
   externalHEAD<X extends RX>(init: string | URLPatternInit, middlewareOrHandler: Middleware<RX, X> | Handler<X>, handler?: Handler<X>): this {
-    return this.#registerPattern('HEAD', arguments.length, new URLPatternImpl(init), middlewareOrHandler, handler);
+    return this.#registerPattern('HEAD', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   /**
@@ -289,14 +293,14 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
    * @param subRouter A `WorkerRouter` that handles the remaining part of the URL, e.g. `/:category/:id`
    * @deprecated The name of this method might change 
    */
-  use<Y extends Context>(path: string, subRouter: WorkerRouter<Y>): this {
-    if (globalThis.process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
+  use<Y extends MatchContext>(path: string, subRouter: WorkerRouter<Y>): this {
+    if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
       if (!path.endsWith('*')) {  
         console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
       }
     }
 
-    const pattern = new URLPatternImpl(toPattern(path))
+    const pattern = new URLPattern(toPattern(path))
     this.#routes.push({
       method: 'ANY',
       pattern,
@@ -308,10 +312,10 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   /** See `.external` and `.use`. 
    * @deprecated Might change name/API 
    */
-  useExternal<Y extends Context>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
-    const pattern = new URLPatternImpl(init)
+  useExternal<Y extends MatchContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
+    const pattern = new URLPattern(init)
 
-    if (globalThis.process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
+    if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
       if (!pattern.pathname.endsWith('*')) {  
         console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
       }
@@ -336,7 +340,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
   }
 
   /** @deprecated Name/API might change */
-  handle: Handler<Context> = (request, ctx) => {
+  handle = (request: Request, ctx?: Omit<Context, 'effects'>) => {
     return this.#route(request.url, { 
       ...ctx,
       request, 
@@ -361,7 +365,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
    * Callback compatible with Cloudflare Worker's `fetch` module export.
    * E.g. `export default router`.
    */
-  fetch = async (request: Request, env?: any, ctx?: any): Promise<Response> => {
+  fetch = (request: Request, env?: any, ctx?: any): Promise<Response> => {
     return this.#route(request.url, { 
       request, 
       waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}), 
@@ -374,7 +378,7 @@ export class WorkerRouter<RX extends Context = Context> implements EventListener
    * Callback that is compatible with Deno's `serve` function.
    * E.g. `serve(router.serveCallback)`.
    */
-  serveCallback = async (request: Request, connInfo: any): Promise<Response> => {
+  serveCallback = (request: Request, connInfo: any): Promise<Response> => {
     return this.#route(request.url, { request, waitUntil: (_f: any) => {}, connInfo });
   }
 }
