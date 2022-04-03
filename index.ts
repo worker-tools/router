@@ -1,5 +1,10 @@
+// deno-lint-ignore-file no-explicit-any
 import { Context, EffectsList, executeEffects } from '../middleware/index.ts';
 import { internalServerError, notFound } from '../response-creators/index.ts';
+import type { 
+  URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult 
+} from 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js';
+export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
 
 export type Awaitable<T> = T | PromiseLike<T>;
 
@@ -88,6 +93,7 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
       const match = pattern.exec(fqURL);
       if (!match) continue
 
+      // @ts-ignore: ...
       return [handler, match] as const;
     }
     return null
