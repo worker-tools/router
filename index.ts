@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { Context, EffectsList, executeEffects } from '../middleware/index.ts';
 import { internalServerError, notFound } from '../response-creators/index.ts';
-import type { 
+import { 
   URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult 
 } from 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
@@ -26,9 +26,9 @@ interface Route {
   handler: RouteHandler
 }
 
-if (!('URLPattern' in globalThis)) {
-  await import(/* webpackMode: "eager" */ 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js')
-}
+// if (!('URLPattern' in globalThis)) {
+//   await import(/* webpackMode: "eager" */ 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js')
+// }
 
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
