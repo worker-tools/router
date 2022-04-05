@@ -44,6 +44,16 @@ await build({
     target: 'ES2019',
   },
   mappings: {
+    "https://ghuc.cc/worker-tools/middleware@master/context.ts": {
+      name: "@worker-tools/middleware",
+      version: "^0.1.0-pre.2",
+      subPath: "/context.ts",
+    },
+    "https://ghuc.cc/worker-tools/response-creators/index.ts": {
+      name: "@worker-tools/response-creators",
+      version: "^1.2.0-pre.3",
+      subPath: "/context.ts",
+    },
     "https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js": {
       name: "urlpattern-polyfill",
       version: "^3.0.0",
