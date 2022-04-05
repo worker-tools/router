@@ -11,11 +11,12 @@ import {
 } from 'https://deno.land/std@0.133.0/testing/asserts.ts'
 import { spy, assertSpyCall, assertSpyCalls } from "https://deno.land/std@0.133.0/testing/mock.ts";
 const { test } = Deno;
-import { ok } from '../../response-creators/index.ts';
+
+import { ok } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
+import { Context } from "https://ghuc.cc/worker-tools/middleware@master/context.ts";
+import { ResolvablePromise } from "https://ghuc.cc/worker-tools/resolvable-promise/index.ts";
 
 import { Awaitable, WorkerRouter } from '../index.ts';
-import { Context } from "../../middleware/context.ts";
-import { ResolvablePromise } from "../../resolvable-promise/index.ts";
 
 const location = {
   origin: 'http://localhost:12334',

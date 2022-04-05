@@ -13,8 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: pnpm/action-setup@v2
+      - uses: denoland/setup-deno@v1
         with:
-          version: 6
-          run_install: true
-      - run: npm test
+          deno-version: v1.x
+      - run: deno test ./test

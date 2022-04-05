@@ -1,9 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-import { Context, EffectsList, executeEffects } from '../middleware/index.ts';
-import { internalServerError, notFound } from '../response-creators/index.ts';
-import { 
-  URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult 
-} from 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js';
+import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware@master/context.ts';
+import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
+import { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
 
 export type Awaitable<T> = T | PromiseLike<T>;
@@ -359,7 +357,7 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    * e.g. `self.addEventListener('fetch', router)`.
    */
   handleEvent = (object: Event) => {
-    const event = object as FetchEvent;
+    const event = object as any;
     event.respondWith(this.#route(event.request.url, { 
       request: event.request, 
       waitUntil: event.waitUntil.bind(event), 

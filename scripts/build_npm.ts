@@ -41,7 +41,7 @@ await build({
   packageManager: 'pnpm',
   compilerOptions: {
     sourceMap: true,
-    target: 'ES2021',
+    target: 'ES2019',
   },
   mappings: {
     "https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js": {
