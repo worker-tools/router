@@ -46,12 +46,11 @@ await build({
   mappings: {
     "https://ghuc.cc/worker-tools/middleware@master/context.ts": {
       name: "@worker-tools/middleware",
-      version: "^0.1.0-pre.2",
-      subPath: "context",
+      version: "latest",
     },
     "https://ghuc.cc/worker-tools/response-creators/index.ts": {
       name: "@worker-tools/response-creators",
-      version: "^1.2.0-pre.3",
+      version: "latest",
     },
     "https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts": {
       name: "urlpattern-polyfill",
