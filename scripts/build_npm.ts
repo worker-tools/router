@@ -52,7 +52,6 @@ await build({
     "https://ghuc.cc/worker-tools/response-creators/index.ts": {
       name: "@worker-tools/response-creators",
       version: "^1.2.0-pre.3",
-      subPath: "/context.ts",
     },
     "https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts": {
       name: "urlpattern-polyfill",
