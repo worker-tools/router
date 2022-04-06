@@ -47,7 +47,7 @@ await build({
     "https://ghuc.cc/worker-tools/middleware@master/context.ts": {
       name: "@worker-tools/middleware",
       version: "^0.1.0-pre.2",
-      subPath: "/context.ts",
+      subPath: "/context.js",
     },
     "https://ghuc.cc/worker-tools/response-creators/index.ts": {
       name: "@worker-tools/response-creators",
