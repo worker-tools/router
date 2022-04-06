@@ -1,7 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware@master/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
-import { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js';
+
+import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
 
 export type Awaitable<T> = T | PromiseLike<T>;

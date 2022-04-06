@@ -54,9 +54,10 @@ await build({
       version: "^1.2.0-pre.3",
       subPath: "/context.ts",
     },
-    "https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js": {
+    "https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts": {
       name: "urlpattern-polyfill",
-      version: "^3.0.0",
+      version: "^4.0.1",
+      subPath: '/dist/index.d.ts'
     },
   },
 });
