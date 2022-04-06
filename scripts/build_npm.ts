@@ -47,7 +47,7 @@ await build({
     "https://ghuc.cc/worker-tools/middleware@master/context.ts": {
       name: "@worker-tools/middleware",
       version: "^0.1.0-pre.2",
-      subPath: "/context.js",
+      subPath: "context",
     },
     "https://ghuc.cc/worker-tools/response-creators/index.ts": {
       name: "@worker-tools/response-creators",
@@ -56,7 +56,7 @@ await build({
     "https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts": {
       name: "urlpattern-polyfill",
       version: "^4.0.1",
-      subPath: '/dist/index.d.ts'
+      subPath: 'dist/index.d.ts'
     },
   },
 });
