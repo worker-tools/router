@@ -25,10 +25,6 @@ interface Route {
   handler: RouteHandler
 }
 
-// if (!('URLPattern' in globalThis)) {
-//   await import(/* webpackMode: "eager" */ 'https://esm.sh/urlpattern-polyfill@3.0.0/dist/index.js')
-// }
-
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
  * Specifically in the case of Service Workers, this ensures requests to external domains that happen to have the same
@@ -299,11 +295,11 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    * @deprecated The name of this method might change 
    */
   use<Y extends MatchContext>(path: string, subRouter: WorkerRouter<Y>): this {
-    if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
-      if (!path.endsWith('*')) {  
-        console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-      }
-    }
+    // if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
+    //   if (!path.endsWith('*')) {  
+    //     console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    //   }
+    // }
 
     const pattern = new URLPattern(toPattern(path))
     this.#routes.push({
@@ -320,11 +316,11 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
   useExternal<Y extends MatchContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
 
-    if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
-      if (!pattern.pathname.endsWith('*')) {  
-        console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-      }
-    }
+    // if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
+    //   if (!pattern.pathname.endsWith('*')) {  
+    //     console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    //   }
+    // }
     this.#routes.push({
       method: 'ANY',
       pattern,
