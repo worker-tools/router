@@ -57,7 +57,10 @@ interface Route {
 // Fix for 
 (<any>self).process ||= {};
 (<any>self).process.env ||= {};
-const DEBUG = (<any>self).process.env.NODE_ENVIRONMENT === 'development' || !!(<any>self).DEBUG;
+const DEBUG = false
+  || (<any>self).process.env.NODE_ENV === 'development'
+  || !!(<any>self).process.env.DEBUG
+  || !!(<any>self).DEBUG
 
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
@@ -439,7 +442,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
    * can have middleware specifically for this route. Note that if another error occurs during the execution of 
    * this middleware, there are no more safety nets and an internal server error response is returned.
    * 
-   * If a global `DEBUG` variable is set (or `process.env.NODE_ENVIRONMENT` is set to `development` in case of webpack)
+   * If a global `DEBUG` variable is set (or `process.env.NODE_ENV` is set to `development` in case of webpack)
    * the router will throw on an unhandled error. This is to make it easier to spot problems during development. 
    * Otherwise, the router will not throw but instead dispatch a `error` event on itself before returning an empty 
    * internal server error response.
