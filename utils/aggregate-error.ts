@@ -1,10 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 class AggregateErrorPolyfill extends Error {
-  errors: readonly any[];
-	constructor(errors: Iterable<any>, message = '') {
+  #errors: unknown[];
+  get name() { return 'AggregateError' }
+  get errors() { return [...this.#errors] }
+	constructor(errors: Iterable<unknown>, message = '') {
 		super(message);
-		this.errors = [...errors];
-    this.name = 'AggregateError';
+		this.#errors = [...errors];
 	}
 }
 

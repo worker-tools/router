@@ -68,7 +68,7 @@ const router = new WorkersRouter()
   })
 ```
 
-## 💥 Error Handling Without Even Try–ing
+## 💥 Error Handling Without Even Trying
 Worker Router has first class support for error handling. Its main purpose is to let you write your handlers without having to wrap everything inside a massive `try {} catch` block. Instead, you can define special recover routes that get invoked when something goes wrong. 
 
 ```js
@@ -79,7 +79,6 @@ const router = new WorkersRouter()
     new Response(`Something went wrong: ${error.message}`, response)
   );
 ```
-
 
 ## ✅ Works with Workers
 Worker Router comes with out of the box support for a variety of Worker Environments:

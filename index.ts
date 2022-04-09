@@ -125,7 +125,6 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
     self.dispatchEvent(new ErrorEvent('error', {
       error,
       message: error instanceof Error ? error.message : undefined,
-      filename: import.meta.url,
     }));
   }
 
