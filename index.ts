@@ -2,28 +2,61 @@
 import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware@master/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
 
+import { AggregateError } from "./utils/aggregate-error.ts";
+
 import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
 
 export type Awaitable<T> = T | PromiseLike<T>;
 
-export interface MatchContext extends Context {
+export interface RouteContext extends Context {
+  /** 
+   * The match that resulted in the execution of this route. It is the full result produced by the URL Pattern API. 
+   * If you are looking for a `params`-like object similar to outer routers, use the `basics` middleware 
+   * or `match.pathname.groups`.
+   */
   match: URLPatternResult
 }
 
-export type BaseMiddleware<X extends MatchContext> = (x: Awaitable<MatchContext>) => Awaitable<X>
-export type Middleware<RX extends MatchContext, X extends MatchContext> = (x: Awaitable<RX>) => Awaitable<X>
-export type Handler<X extends MatchContext> = (request: Request, ctx: X) => Awaitable<Response>;
+export interface ErrorContext extends RouteContext {
+  /**
+   * If the exception is well-known and caused by middleware, this property is populated with a `Response` object 
+   * with an appropriate status code and text set. 
+   * 
+   * You can use it to customize the error response, e.g.: `new Response('...', response)`.
+   */
+  response: Response,
+
+  /**
+   * If an unknown error occurred, the sibling `response` property is set to be an "internal server error" while
+   * the `error` property contains thrown error.
+   */
+  error?: unknown,
+}
+
+export type Middleware<RX extends RouteContext, X extends RouteContext> = (x: Awaitable<RX>) => Awaitable<X>
+
+export type Handler<X extends RouteContext> = (request: Request, ctx: X) => Awaitable<Response>;
+export type ErrorHandler<X extends ErrorContext> = (request: Request, ctx: X) => Awaitable<Response>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-type MethodWildcard = 'ANY';
 
-type RouteHandler = (x: MatchContext) => Awaitable<Response> 
+
+// Internal types...  these are not the types you are looking for
+type MethodWildcard = 'ANY';
+type RouteHandler = (x: RouteContext) => Awaitable<Response>
+type RecoverRouteHandler = (x: ErrorContext) => Awaitable<Response>
+
 interface Route {
   method: Method | MethodWildcard
   pattern: URLPattern
-  handler: RouteHandler
+  handler: RouteHandler | RecoverRouteHandler
 }
+
+// Fix for 
+(<any>self).process ||= {};
+(<any>self).process.env ||= {};
+const DEBUG = (<any>self).process.env.NODE_ENVIRONMENT === 'development' || !!(<any>self).DEBUG;
 
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
@@ -34,11 +67,11 @@ interface Route {
  * this is essentially a noop since only matching requests can reach deployed workers in the first place.
  */
 function toPattern(pathname: string) {
-  const pattern = new URLPattern({ 
-    pathname, 
-    protocol: globalThis.location?.protocol,
-    hostname: globalThis.location?.hostname,
-    port: globalThis.location?.port,
+  const pattern = new URLPattern({
+    pathname,
+    protocol: self.location?.protocol,
+    hostname: self.location?.hostname,
+    port: self.location?.port,
   })
   // Note that `undefined` becomes a `*` pattern.
   return pattern;
@@ -47,49 +80,63 @@ function toPattern(pathname: string) {
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
 // const anyPathResult = Object.freeze(toPattern('/*').exec(new Request('/').url)!);
 
-export class WorkerRouter<RX extends MatchContext = MatchContext> implements EventListenerObject {
-  #middleware: BaseMiddleware<RX>
+export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventTarget implements EventListenerObject {
+  #middleware: Middleware<RouteContext, RX>
   #routes: Route[] = [];
+  #recoverRoutes: Route[] = [];
 
-  constructor(middleware: BaseMiddleware<RX> = _ => _ as RX) {
+  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX) {
+    super();
     this.#middleware = middleware;
   }
 
   async #route(fqURL: string, ctx: Omit<Context, 'effects'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
-    if (result) {
-      try {
-        const [handler, match] = result;
-        const effects = new EffectsList();
-        return await handler(Object.assign(ctx, { effects, match }));
-      } catch (err) {
-        if (err instanceof Response) {
-          return err; // TODO: customization??
-        } 
-        throw err;
-      }
+    try {
+      if (!result) throw notFound();
+      const [handler, match] = result;
+      return await handler(Object.assign(ctx, { match, effects: new EffectsList() }));
     }
-    return notFound();
+    catch (err) {
+      const recoverResult = this.#execPatterns(fqURL, ctx.request, this.#recoverRoutes)
+      if (recoverResult) {
+        try {
+          const [handler, match] = recoverResult;
+          const [response, error] = err instanceof Response ? [err, undefined] : [internalServerError(), err];
+          return await handler(Object.assign(ctx, { match, response, error, effects: new EffectsList() }));
+        }
+        catch (recoverErr) {
+          const aggregateErr = new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
+          if (DEBUG) throw aggregateErr
+          if (recoverErr instanceof Response) return recoverErr;
+          if (err instanceof Response) return err;
+          this.#fireError(aggregateErr);
+          return internalServerError();
+        }
+      }
+      if (DEBUG) throw err
+      if (err instanceof Response) return err
+      this.#fireError(err);
+      return internalServerError();
+    }
   }
 
-  #execPatterns(fqURL: string, request: Request): readonly [RouteHandler, URLPatternResult] | null {
-    for (const { method, pattern, handler } of this.#routes) {
+  #fireError(error: unknown) {
+    self.dispatchEvent(new ErrorEvent('error', {
+      error,
+      message: error instanceof Error ? error.message : undefined,
+      filename: import.meta.url,
+    }));
+  }
+
+  #execPatterns(fqURL: string, request: Request, routes = this.#routes): readonly [RouteHandler, URLPatternResult] | null {
+    for (const { method, pattern, handler } of routes) {
       if (method !== 'ANY' && method !== request.method.toUpperCase()) continue
 
-      // FIXME: make work with external. Or maybe just drop...
-      // if (pattern.pathname === '*') {
-      //   const { pathname: input } = new URL(url)
-      //   return [handler, { ...anyResult, pathname: { input, groups: { '0': input } } }]
-      // }
-      // if (pattern.pathname === '/*') {
-      //   const { pathname: input } = new URL(url)
-      //   return [handler, { ...anyPathResult, pathname: { input, groups: { '0': input.substring(1) } } }]
-      // }
-      
       const match = pattern.exec(fqURL);
       if (!match) continue
 
-      // @ts-ignore: ...
+      // @ts-ignore: FIXME
       return [handler, match] as const;
     }
     return null
@@ -103,10 +150,10 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
     this.#routes.push({
       method,
       pattern,
-      handler: async event => {
+      handler: async (event: RouteContext) => {
         const ctx = await this.#middleware(event);
         const response = handler(event.request, ctx);
-        return executeEffects(event.effects!, response)
+        return executeEffects(event.effects, response)
       },
     })
   }
@@ -120,10 +167,10 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
     this.#routes.push({
       method,
       pattern,
-      handler: async event => {
+      handler: async (event: RouteContext) => {
         const ctx = await middleware(this.#middleware(event))
         const response = handler(event.request, ctx);
-        return executeEffects(event.effects!, response)
+        return executeEffects(event.effects, response)
       },
     })
   }
@@ -145,6 +192,57 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
       throw Error(`Router '${method.toLowerCase()}' called with invalid number of arguments`)
     }
     return this;
+  }
+
+  #registerRecoverPattern<X extends ErrorContext>(
+    method: Method | MethodWildcard,
+    argsN: number,
+    pattern: URLPattern,
+    middlewareOrHandler: Middleware<ErrorContext, X> | ErrorHandler<ErrorContext>,
+    handler?: ErrorHandler<X>,
+  ): this {
+    if (argsN === 2) {
+      const handler = middlewareOrHandler as ErrorHandler<ErrorContext>
+      this.#pushRecoverRoute(method, pattern, handler)
+    } else if (argsN === 3) {
+      const middleware = middlewareOrHandler as Middleware<ErrorContext, X>
+      this.#pushMiddlewareRecoverRoute(method, pattern, middleware, handler!)
+    } else {
+      throw Error(`Router '${method.toLowerCase()}' called with invalid number of arguments`)
+    }
+    return this;
+  }
+
+  #pushRecoverRoute(
+    method: Method | MethodWildcard,
+    pattern: URLPattern,
+    handler: ErrorHandler<ErrorContext>,
+  ) {
+    this.#recoverRoutes.push({
+      method,
+      pattern,
+      handler: (event: ErrorContext) => {
+        const response = handler(event.request, event)
+        return executeEffects(event.effects, response)
+      },
+    });
+  }
+
+  #pushMiddlewareRecoverRoute<X extends ErrorContext>(
+    method: Method | MethodWildcard,
+    pattern: URLPattern,
+    middleware: Middleware<ErrorContext, X>,
+    handler: Handler<X>,
+  ) {
+    this.#recoverRoutes.push({
+      method,
+      pattern,
+      handler: async (event: ErrorContext) => {
+        const ctx = await middleware(event)
+        const response = handler(event.request, ctx);
+        return executeEffects(event.effects, response)
+      },
+    });
   }
 
   /** Add a route that matches *any* HTTP method. */
@@ -293,14 +391,12 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    * 
    * @param path A pattern ending in a wildcard, e.g. `/items*`
    * @param subRouter A `WorkerRouter` that handles the remaining part of the URL, e.g. `/:category/:id`
-   * @deprecated The name of this method might change 
+   * @deprecated The name of this method might change to avoid confusion with `use` method known from other routers.
    */
-  use<Y extends MatchContext>(path: string, subRouter: WorkerRouter<Y>): this {
-    // if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
-    //   if (!path.endsWith('*')) {  
-    //     console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-    //   }
-    // }
+  use<Y extends RouteContext>(path: string, subRouter: WorkerRouter<Y>): this {
+    if (DEBUG && !path.endsWith('*')) {
+      console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    }
 
     const pattern = new URLPattern(toPattern(path))
     this.#routes.push({
@@ -311,23 +407,53 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
     return this;
   }
 
-  /** See `.external` and `.use`. 
+  /** 
+   * See `.external` and `.use`. 
    * @deprecated Might change name/API 
    */
-  useExternal<Y extends MatchContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
+  useExternal<Y extends RouteContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
 
-    // if ((<any>globalThis).process?.env?.NODE_ENVIRONMENT === 'development' || (<any>globalThis).DEBUG) {
-    //   if (!pattern.pathname.endsWith('*')) {  
-    //     console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-    //   }
-    // }
+    if (DEBUG && !pattern.pathname.endsWith('*')) {
+      console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    }
+
     this.#routes.push({
       method: 'ANY',
       pattern,
       handler: subRouter.#routeHandler,
     })
     return this;
+  }
+
+  /**
+   * Register a special route to recover from an error during execution of a regular route. 
+   * 
+   * In addition to the usual context properties, the provided handler receives a `response` and `error` property. 
+   * In case of a well-known error (typically caused by middleware),
+   * the `response` contains a Fetch API `Response` object with matching status and status text set. 
+   * In case of an unknown error, the `response` is a generic "internal server error" and the `error` property 
+   * contains the value caught by the catch block.
+   * 
+   * Recover routes don't execute the router-level middleware (which might have caused the error), but
+   * can have middleware specifically for this route. Note that if another error occurs during the execution of 
+   * this middleware, there are no more safety nets and an internal server error response is returned.
+   * 
+   * If a global `DEBUG` variable is set (or `process.env.NODE_ENVIRONMENT` is set to `development` in case of webpack)
+   * the router will throw on an unhandled error. This is to make it easier to spot problems during development. 
+   * Otherwise, the router will not throw but instead dispatch a `error` event on itself before returning an empty 
+   * internal server error response.
+   */
+  recover(path: string, handler: Handler<ErrorContext>): this;
+  recover<X extends ErrorContext>(path: string, middleware: Middleware<ErrorContext, X>, handler: Handler<X>): this;
+  recover<X extends ErrorContext>(path: string, middlewareOrHandler: Middleware<ErrorContext, X> | Handler<ErrorContext>, handler?: Handler<X>): this {
+    return this.#registerRecoverPattern('ANY', arguments.length, toPattern(path), middlewareOrHandler, handler);
+  }
+
+  recoverExternal(init: string | URLPatternInit, handler: Handler<ErrorContext>): this;
+  recoverExternal<X extends ErrorContext>(init: string | URLPatternInit, middleware: Middleware<ErrorContext, X>, handler: Handler<X>): this;
+  recoverExternal<X extends ErrorContext>(init: string | URLPatternInit, middlewareOrHandler: Middleware<ErrorContext, X> | Handler<ErrorContext>, handler?: Handler<X>): this {
+    return this.#registerRecoverPattern('ANY', arguments.length, new URLPattern(init), middlewareOrHandler, handler);
   }
 
   #routeHandler: RouteHandler = (ctx) => {
@@ -343,10 +469,10 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
 
   /** @deprecated Name/API might change */
   handle = (request: Request, ctx?: Omit<Context, 'effects'>) => {
-    return this.#route(request.url, { 
+    return this.#route(request.url, {
       ...ctx,
-      request, 
-      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}) 
+      request,
+      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => { })
     })
   }
 
@@ -356,9 +482,9 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    */
   handleEvent = (object: Event) => {
     const event = object as any;
-    event.respondWith(this.#route(event.request.url, { 
-      request: event.request, 
-      waitUntil: event.waitUntil.bind(event), 
+    event.respondWith(this.#route(event.request.url, {
+      request: event.request,
+      waitUntil: event.waitUntil.bind(event),
       event,
     }));
   }
@@ -368,10 +494,10 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    * E.g. `export default router`.
    */
   fetch = (request: Request, env?: any, ctx?: any): Promise<Response> => {
-    return this.#route(request.url, { 
-      request, 
-      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => {}), 
-      env, 
+    return this.#route(request.url, {
+      request,
+      waitUntil: ctx?.waitUntil?.bind(ctx) ?? ((_f: any) => { }),
+      env,
       ctx,
     });
   }
@@ -381,6 +507,30 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
    * E.g. `serve(router.serveCallback)`.
    */
   serveCallback = (request: Request, connInfo: any): Promise<Response> => {
-    return this.#route(request.url, { request, waitUntil: (_f: any) => {}, connInfo });
+    return this.#route(request.url, { request, waitUntil: (_f: any) => { }, connInfo });
+  }
+
+  // Provide types for error handler:
+  addEventListener(
+    type: 'error', 
+    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
+    super.addEventListener(...args)
+  }
+
+  removeEventListener(
+    type: 'error', 
+    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    options?: EventListenerOptions | boolean,
+  ): void;
+  removeEventListener(...args: Parameters<EventTarget['removeEventListener']>) {
+    super.removeEventListener(...args)
   }
 }
+
+// Helper types
+type GenericEventListener<E extends Event> = (evt: E) => void | Promise<void>;
+type GenericEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
+type GenericEventListenerOrEventListenerObject<E extends Event> = GenericEventListener<E> | GenericEventListenerObject<E>;

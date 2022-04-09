@@ -30,6 +30,7 @@ const myReusableMW = combine(
   signedCookies({ secret: 'password123' }), 
   cookieSession({ user: '' })
 );
+
 const router = new WorkersRouter()
   .get('/', myReusableMW, () => ok())
   .post('/', combine(myReusableMW, bodyParser()), () => ok())
@@ -67,10 +68,17 @@ const router = new WorkersRouter()
   })
 ```
 
-## 💥 Errors Without Even Try–ing
-Worker Router has first class support for error handling. Its main purpose is to let you write your handlers without having to wrap everything inside a massive `try {} catch` block. Instead, you can define special `.recover` routes, that get invoked when something goes wrong. There you are free to 
+## 💥 Error Handling Without Even Try–ing
+Worker Router has first class support for error handling. Its main purpose is to let you write your handlers without having to wrap everything inside a massive `try {} catch` block. Instead, you can define special recover routes that get invoked when something goes wrong. 
 
-TODOOOOOOOOOOOOOOOOOO
+```js
+const router = new WorkersRouter()
+  .get('/', () => ok('Main Page'))
+  .get('/about', () => { throw Error('bang') })
+  .recover('*', (req, { error, response }) => 
+    new Response(`Something went wrong: ${error.message}`, response)
+  );
+```
 
 
 ## ✅ Works with Workers
@@ -98,7 +106,7 @@ To use it with Deno/Deploy's `serve` function, use
 serve(router.serveCallback)
 ```
 
-<!-- While Worker Router is influenced by some earlier work, it is __not in the tradition__ of express, koa and other modify-in-place routers, save for aspects of its high level  API.
+<!-- While Worker Router is influenced by earlier work, it is __not in the tradition__ of express, koa and other modify-in-place routers, save for aspects of its high level  API.
 At it's core, Worker Router is a function of `(req: Request, ctx: Context) => Promise<Response>`. In this model, 
 middleware is another function that *adds* properties to the context, which is fully tracked by the type system. Conversely, middleware that is not applied is also absent and not polluting the context object. -->
 

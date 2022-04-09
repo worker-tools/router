@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import 'https://gist.githubusercontent.com/qwtel/b14f0f81e3a96189f7771f83ee113f64/raw/TestRequest.ts'
 import {
   assert,
@@ -12,8 +13,8 @@ import {
 import { spy, assertSpyCall, assertSpyCalls } from "https://deno.land/std@0.133.0/testing/mock.ts";
 const { test } = Deno;
 
-import { ok } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
-import { Context } from "https://ghuc.cc/worker-tools/middleware@master/context.ts";
+import { ok, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
+import { Context, createMiddleware } from "https://ghuc.cc/worker-tools/middleware@master/context.ts";
 import { ResolvablePromise } from "https://ghuc.cc/worker-tools/resolvable-promise/index.ts";
 
 import { Awaitable, WorkerRouter } from '../index.ts';
@@ -116,6 +117,19 @@ test('patterns', async () => {
   assert(called)
 })
 
+test('error recovery', async () => {
+  let called = false
+  const router = new WorkerRouter()
+    .get('/item/:id', () => { throw new Response(null, { status: 418 }) })
+    .recover('*', (req, { response }) => {
+      called = true;
+      assertEquals(response.status, 418);
+      return new Response('something went wrong', response);
+    })
+  await router.handle(new Request('/item/3'))
+  assert(called)
+})
+
 test('multi patterns', async () => {
   let called = false;
   const router = new WorkerRouter().get('/item/:type/:id', (req, ctx) => {
@@ -198,6 +212,7 @@ test('external resources', async () => {
 
   const router = new WorkerRouter()
     .external('https://exmaple.com/*', callback)
+    .any('*', () => notFound())
 
   await Promise.all([
     router.handle(new Request('https://exmaple.com/api/call')),
