@@ -8,6 +8,6 @@ class AggregateErrorPolyfill extends Error {
 	}
 }
 
-export const AggregateError: typeof AggregateErrorPolyfill = 'AggregateError' in globalThis 
-  ? (<any>globalThis).AggregateError 
+export const AggregateError: typeof AggregateErrorPolyfill = 'AggregateError' in self 
+  ? (<any>self).AggregateError 
   : AggregateErrorPolyfill
