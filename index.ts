@@ -3,6 +3,7 @@ import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-too
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
 
 import { AggregateError } from "./utils/aggregate-error.ts";
+import { ErrorEvent } from './utils/error-event.ts';
 
 import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
@@ -533,3 +534,4 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
 type GenericEventListener<E extends Event> = (evt: E) => void | Promise<void>;
 type GenericEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
 type GenericEventListenerOrEventListenerObject<E extends Event> = GenericEventListener<E> | GenericEventListenerObject<E>;
+
