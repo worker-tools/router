@@ -27,6 +27,7 @@ interface Route {
 
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
+ * 
  * Specifically in the case of Service Workers, this ensures requests to external domains that happen to have the same
  * pathname aren't matched. 
  * If a worker environment has a location set (e.g. deno with `--location` or CF workers with a location polyfill), 
@@ -39,6 +40,7 @@ function toPattern(pathname: string) {
     hostname: globalThis.location?.hostname,
     port: globalThis.location?.port,
   })
+  // Note that `undefined` becomes a `*` pattern.
   return pattern;
 }
 
@@ -67,7 +69,6 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
         throw err;
       }
     }
-    // TODO: customization??
     return notFound();
   }
 
@@ -308,7 +309,7 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
       handler: subRouter.#routeHandler,
     })
     return this;
-  };
+  }
 
   /** See `.external` and `.use`. 
    * @deprecated Might change name/API 
@@ -337,7 +338,7 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
       const subURL = new URL(values.at(-1)!, baseURL);
       return this.#route(subURL.href, ctx);
     }
-    throw Error('Pattern not suitable for nested routing. Did you forget to add a wildcard (*)?')
+    throw TypeError('Pattern not suitable for nested routing. Did you forget to add a wildcard (*)?')
   }
 
   /** @deprecated Name/API might change */
@@ -360,7 +361,7 @@ export class WorkerRouter<RX extends MatchContext = MatchContext> implements Eve
       waitUntil: event.waitUntil.bind(event), 
       event,
     }));
-  };
+  }
 
   /**
    * Callback compatible with Cloudflare Worker's `fetch` module export.

@@ -166,7 +166,7 @@ test('ignores search params and hashes', async () => {
 
 test('middleware', async () => {
   let called = false;
-  const mw = async <X extends Context>(x: Awaitable<X>) => ({ ...await x, foo: 'bar' })
+  const mw = createMiddleware(() => ({ foo: '' }), async x => ({ ...await x, foo: 'bar' }))
   const router = new WorkerRouter().get('/', mw, (req, ctx) => {
     assertEquals(ctx.foo, 'bar')
     called = true;
