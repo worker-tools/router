@@ -73,24 +73,24 @@ function toPattern(pathname: string) {
   return pattern;
 }
 
-// export interface WorkerRouterOptions {
-//   /** @deprecated Might change name */
-//   debug?: boolean
-// }
+export interface WorkerRouterOptions {
+  /** @deprecated Might change name */
+  debug?: boolean
+}
 
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
 // const anyPathResult = Object.freeze(toPattern('/*').exec(new Request('/').url)!);
 
-export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends EventTarget */ implements EventListenerObject {
+export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventTarget implements EventListenerObject {
   #middleware: Middleware<RouteContext, RX>
   #routes: Route[] = [];
   #recoverRoutes: Route[] = [];
-  // #opts: WorkerRouterOptions;
+  #opts: WorkerRouterOptions;
 
-  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX /*, opts: WorkerRouterOptions = {} */) {
-    // super();
+  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX, opts: WorkerRouterOptions = {}) {
+    super();
     this.#middleware = middleware;
-    // this.#opts = opts;
+    this.#opts = opts;
   }
 
   async #route(fqURL: string, ctx: Omit<Context, 'effects'>): Promise<Response> {
@@ -110,17 +110,17 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
         }
         catch (recoverErr) {
           const aggregateErr = new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
-          throw aggregateErr
-          // if (recoverErr instanceof Response) return recoverErr;
-          // if (err instanceof Response) return err;
-          // this.#fireError(aggregateErr);
-          // return internalServerError();
+          if (this.#opts.debug) throw aggregateErr
+          if (recoverErr instanceof Response) return recoverErr;
+          if (err instanceof Response) return err;
+          this.#fireError(aggregateErr);
+          return internalServerError();
         }
       }
-      throw err
-      // if (err instanceof Response) return err
-      // this.#fireError(err);
-      // return internalServerError();
+      if (this.#opts.debug) throw err
+      if (err instanceof Response) return err
+      this.#fireError(err);
+      return internalServerError();
     }
   }
 
@@ -396,7 +396,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
    * @deprecated The name of this method might change to avoid confusion with `use` method known from other routers.
    */
   use<Y extends RouteContext>(path: string, subRouter: WorkerRouter<Y>): this {
-    if (!path.endsWith('*')) {
+    if (this.#opts.debug && !path.endsWith('*')) {
       console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
 
@@ -414,7 +414,8 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
    */
   useExternal<Y extends RouteContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
-    if (!pattern.pathname.endsWith('*')) {
+
+    if (this.#opts.debug && !pattern.pathname.endsWith('*')) {
       console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
     this.#routes.push({
@@ -510,27 +511,27 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
   }
 
   // Provide types for error handler:
-  // addEventListener(
-  //   type: 'error', 
-  //   listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
-  //   options?: boolean | AddEventListenerOptions,
-  // ): void;
-  // addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
-  //   super.addEventListener(...args)
-  // }
+  addEventListener(
+    type: 'error', 
+    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
+    super.addEventListener(...args)
+  }
 
-  // removeEventListener(
-  //   type: 'error', 
-  //   listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
-  //   options?: EventListenerOptions | boolean,
-  // ): void;
-  // removeEventListener(...args: Parameters<EventTarget['removeEventListener']>) {
-  //   super.removeEventListener(...args)
-  // }
+  removeEventListener(
+    type: 'error', 
+    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    options?: EventListenerOptions | boolean,
+  ): void;
+  removeEventListener(...args: Parameters<EventTarget['removeEventListener']>) {
+    super.removeEventListener(...args)
+  }
 }
 
-// // Helper types
-// type GenericEventListener<E extends Event> = (evt: E) => void | Promise<void>;
-// type GenericEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
-// type GenericEventListenerOrEventListenerObject<E extends Event> = GenericEventListener<E> | GenericEventListenerObject<E>;
+// Helper types
+type GenericEventListener<E extends Event> = (evt: E) => void | Promise<void>;
+type GenericEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
+type GenericEventListenerOrEventListenerObject<E extends Event> = GenericEventListener<E> | GenericEventListenerObject<E>;
 
