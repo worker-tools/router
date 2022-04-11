@@ -77,8 +77,7 @@ test('routes', async () => {
 })
 
 test('handle', async () => {
-  const router = new WorkerRouter().get('/', ctx => {
-    const { request: req } = ctx
+  const router = new WorkerRouter().get('/', (req, ctx) => {
     assert(req instanceof Request)
     assertEquals(req.method, 'GET')
     assertEquals(req.url, new URL('/', location.origin).href)
@@ -89,7 +88,7 @@ test('handle', async () => {
 })
 
 test('all methods', async () => {
-  const callback = spy(({ request: req }: { request: Request }) => {
+  const callback = spy((req: Request) => {
     assert(req instanceof Request)
     return ok();
   })
@@ -107,7 +106,7 @@ test('all methods', async () => {
 
 test('patterns', async () => {
   let called = false
-  const router = new WorkerRouter().get('/item/:id', ctx => {
+  const router = new WorkerRouter().get('/item/:id', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/3')
     assertEquals(ctx.match.pathname.groups, { id: '3' })
@@ -122,7 +121,7 @@ test('error recovery', async () => {
   let called = false
   const router = new WorkerRouter()
     .get('/item/:id', () => { throw new Response(null, { status: 418 }) })
-    .recover('*', ({ response }) => {
+    .recover('*', (req, { response }) => {
       called = true;
       assertEquals(response.status, 418);
       return new Response('something went wrong', response);
@@ -133,7 +132,7 @@ test('error recovery', async () => {
 
 test('multi patterns', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/item/:type/:id', ctx => {
+  const router = new WorkerRouter().get('/item/:type/:id', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/soap/3')
     assertEquals(ctx.match.pathname.groups, { type: 'soap', id: '3' })
@@ -146,7 +145,7 @@ test('multi patterns', async () => {
 
 test('wildcards *', async () => {
   let called = false;
-  const router = new WorkerRouter().get('*', ctx => {
+  const router = new WorkerRouter().get('*', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/soap/3')
     assertEquals(ctx.match.pathname.groups, { 0: '/item/soap/3' })
@@ -159,7 +158,7 @@ test('wildcards *', async () => {
 
 test('wildcards /*', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/*', ctx => {
+  const router = new WorkerRouter().get('/*', (req, ctx) => {
     assertEquals(ctx.match.pathname.groups, { 0: 'item/soap/3' })
     called = true;
     return ok();
@@ -170,7 +169,7 @@ test('wildcards /*', async () => {
 
 test('ignores search params and hashes', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/item/soap/:id', ctx => {
+  const router = new WorkerRouter().get('/item/soap/:id', (req, ctx) => {
     assertEquals(ctx.match.pathname.groups['id'], '3')
     called = true;
     return ok();
@@ -182,7 +181,7 @@ test('ignores search params and hashes', async () => {
 test('middleware', async () => {
   let called = false;
   const mw = createMiddleware(() => ({ foo: '' }), async x => ({ ...await x, foo: 'bar' }))
-  const router = new WorkerRouter().get('/', mw, ctx => {
+  const router = new WorkerRouter().get('/', mw, (req, ctx) => {
     assertEquals(ctx.foo, 'bar')
     called = true;
     return ok();
@@ -194,7 +193,7 @@ test('middleware', async () => {
 
 test('delegation', async () => {
   const itemRouter = new WorkerRouter()
-    .get('/:type/:id', ctx => {
+    .get('/:type/:id', (req, ctx) => {
       assertEquals(ctx.match.pathname.groups, { type: 'soap', id: '3' })
       return ok()
     })
@@ -280,7 +279,7 @@ test('module fetch export', async () => {
   const envCtx = { waitUntil() {} }
   const theResponse = ok();
   const router = new WorkerRouter()
-    .any('*', ({ env, waitUntil }) => {
+    .any('*', (req, { env, waitUntil }) => {
       assertExists(waitUntil)
       assertStrictEquals(env, theEnv)
       return theResponse;
