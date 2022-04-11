@@ -54,14 +54,6 @@ interface Route {
   handler: RouteHandler | RecoverRouteHandler
 }
 
-// Fix for 
-(<any>self).process ||= {};
-(<any>self).process.env ||= {};
-const DEBUG = false
-  || (<any>self).process.env.NODE_ENV === 'development'
-  || !!(<any>self).process.env.DEBUG
-  || !!(<any>self).DEBUG
-
 /** 
  * Turns a pathname pattern into a `URLPattern` that works across worker environments.
  * 
@@ -81,6 +73,11 @@ function toPattern(pathname: string) {
   return pattern;
 }
 
+export interface WorkerRouterOptions {
+  /** @deprecated Might change name */
+  debug?: boolean
+}
+
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
 // const anyPathResult = Object.freeze(toPattern('/*').exec(new Request('/').url)!);
 
@@ -88,10 +85,12 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   #middleware: Middleware<RouteContext, RX>
   #routes: Route[] = [];
   #recoverRoutes: Route[] = [];
+  #opts: WorkerRouterOptions;
 
-  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX) {
+  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX, opts: WorkerRouterOptions = {}) {
     super();
     this.#middleware = middleware;
+    this.#opts = opts;
   }
 
   async #route(fqURL: string, ctx: Omit<Context, 'effects'>): Promise<Response> {
@@ -111,14 +110,14 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
         }
         catch (recoverErr) {
           const aggregateErr = new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
-          if (DEBUG) throw aggregateErr
+          if (this.#opts.debug) throw aggregateErr
           if (recoverErr instanceof Response) return recoverErr;
           if (err instanceof Response) return err;
           this.#fireError(aggregateErr);
           return internalServerError();
         }
       }
-      if (DEBUG) throw err
+      if (this.#opts.debug) throw err
       if (err instanceof Response) return err
       this.#fireError(err);
       return internalServerError();
@@ -397,7 +396,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
    * @deprecated The name of this method might change to avoid confusion with `use` method known from other routers.
    */
   use<Y extends RouteContext>(path: string, subRouter: WorkerRouter<Y>): this {
-    if (DEBUG && !path.endsWith('*')) {
+    if (this.#opts.debug && !path.endsWith('*')) {
       console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
 
@@ -417,7 +416,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   useExternal<Y extends RouteContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
 
-    if (DEBUG && !pattern.pathname.endsWith('*')) {
+    if (this.#opts.debug && !pattern.pathname.endsWith('*')) {
       console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
 
