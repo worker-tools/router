@@ -400,10 +400,9 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
       console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
 
-    const pattern = new URLPattern(toPattern(path))
     this.#routes.push({
       method: 'ANY',
-      pattern,
+      pattern: toPattern(path),
       handler: subRouter.#routeHandler,
     })
     return this;
@@ -415,11 +414,9 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
    */
   useExternal<Y extends RouteContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
-
     if (!pattern.pathname.endsWith('*')) {
       console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
     }
-
     this.#routes.push({
       method: 'ANY',
       pattern,
