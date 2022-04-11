@@ -10,8 +10,8 @@ This allows even JavaScript users to benefit from inline documentation and API d
 
 ```js
 const router = new WorkersRouter(basics())
-  .get('/about', (req, { userAgent }) => ok())
-  .get('/login', unsignedCookies(), (req, { userAgent, cookies }) => ok())
+  .get('/about', ({ request, userAgent }) => ok())
+  .get('/login', unsignedCookies(), ({ request, userAgent, cookies }) => ok())
 ```
 
 In this example your editor can infer the types and documentation for
@@ -44,8 +44,8 @@ Worker Router supports delegating entire sub routes to another router:
 
 ```js
 const itemRouter = new WorkerRouter()
-  .get('/', (req, { params }) => ok(`Matched "/item/`))
-  .get('/:id', (req, { params }) => ok(`Matched "/item/${params.id}`))
+  .get('/', ({ params }) => ok(`Matched "/item/`))
+  .get('/:id', ({ params }) => ok(`Matched "/item/${params.id}`))
 
 const router = new WorkersRouter()
   .get('/', () => ok('Main Page'))
@@ -75,7 +75,7 @@ Worker Router has first class support for error handling. Its main purpose is to
 const router = new WorkersRouter()
   .get('/', () => ok('Main Page'))
   .get('/about', () => { throw Error('bang') })
-  .recover('*', (req, { error, response }) => 
+  .recover('*', ({ error, response }) => 
     new Response(`Something went wrong: ${error.message}`, response)
   );
 ```
