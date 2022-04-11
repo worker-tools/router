@@ -3,7 +3,7 @@ import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-too
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
 
 import { AggregateError } from "./utils/aggregate-error.ts";
-import { ErrorEvent } from './utils/error-event.ts';
+// import { ErrorEvent } from './utils/error-event.ts';
 
 import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts';
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
@@ -28,11 +28,11 @@ export interface ErrorContext extends RouteContext {
    */
   response: Response,
 
-  /**
-   * If an unknown error occurred, the sibling `response` property is set to be an "internal server error" while
-   * the `error` property contains thrown error.
-   */
-  error?: unknown,
+  // /**
+  //  * If an unknown error occurred, the sibling `response` property is set to be an "internal server error" while
+  //  * the `error` property contains thrown error.
+  //  */
+  // error?: unknown,
 }
 
 export type Middleware<RX extends RouteContext, X extends RouteContext> = (x: Awaitable<RX>) => Awaitable<X>
@@ -101,20 +101,21 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
       return await handler(Object.assign(ctx, { match, effects: new EffectsList() }));
     }
     catch (err) {
-      const recoverResult = this.#execPatterns(fqURL, ctx.request, this.#recoverRoutes)
-      if (recoverResult) {
-        try {
-          const [handler, match] = recoverResult;
-          const [response, error] = err instanceof Response ? [err, undefined] : [internalServerError(), err];
-          return await handler(Object.assign(ctx, { match, response, error, effects: new EffectsList() }));
-        }
-        catch (recoverErr) {
-          const aggregateErr = new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
-          throw aggregateErr
-          // if (recoverErr instanceof Response) return recoverErr;
-          // if (err instanceof Response) return err;
-          // this.#fireError(aggregateErr);
-          // return internalServerError();
+      if (err instanceof Response) {
+        const recoverResult = this.#execPatterns(fqURL, ctx.request, this.#recoverRoutes)
+        if (recoverResult) {
+          try {
+            const [handler, match] = recoverResult;
+            return await handler(Object.assign(ctx, { match, response: err, effects: new EffectsList() }));
+          }
+          catch (recoverErr) {
+            throw new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
+            // throw aggregateErr
+            // if (recoverErr instanceof Response) return recoverErr;
+            // if (err instanceof Response) return err;
+            // this.#fireError(aggregateErr);
+            // return internalServerError();
+          }
         }
       }
       throw err
@@ -124,12 +125,12 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
     }
   }
 
-  #fireError(error: unknown) {
-    self.dispatchEvent(new ErrorEvent('error', {
-      error,
-      message: error instanceof Error ? error.message : undefined,
-    }));
-  }
+  // #fireError(error: unknown) {
+  //   self.dispatchEvent(new ErrorEvent('error', {
+  //     error,
+  //     message: error instanceof Error ? error.message : undefined,
+  //   }));
+  // }
 
   #execPatterns(fqURL: string, request: Request, routes = this.#routes): readonly [RouteHandler, URLPatternResult] | null {
     for (const { method, pattern, handler } of routes) {
