@@ -37,8 +37,8 @@ export interface ErrorContext extends RouteContext {
 
 export type Middleware<RX extends RouteContext, X extends RouteContext> = (x: Awaitable<RX>) => Awaitable<X>
 
-export type Handler<X extends RouteContext> = (request: Request, ctx: X) => Awaitable<Response>;
-export type ErrorHandler<X extends ErrorContext> = (request: Request, ctx: X) => Awaitable<Response>;
+export type Handler<X extends RouteContext> = (ctx: X) => Awaitable<Response>;
+export type ErrorHandler<X extends ErrorContext> = (ctx: X) => Awaitable<Response>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
@@ -154,7 +154,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       pattern,
       handler: async (event: RouteContext) => {
         const ctx = await this.#middleware(event);
-        const response = handler(event.request, ctx);
+        const response = handler(ctx);
         return executeEffects(event.effects, response)
       },
     })
@@ -171,7 +171,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       pattern,
       handler: async (event: RouteContext) => {
         const ctx = await middleware(this.#middleware(event))
-        const response = handler(event.request, ctx);
+        const response = handler(ctx);
         return executeEffects(event.effects, response)
       },
     })
@@ -224,7 +224,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       method,
       pattern,
       handler: (event: ErrorContext) => {
-        const response = handler(event.request, event)
+        const response = handler(event)
         return executeEffects(event.effects, response)
       },
     });
@@ -241,7 +241,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       pattern,
       handler: async (event: ErrorContext) => {
         const ctx = await middleware(event)
-        const response = handler(event.request, ctx);
+        const response = handler(ctx);
         return executeEffects(event.effects, response)
       },
     });
