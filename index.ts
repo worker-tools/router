@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware@master/context.ts';
+import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
 
 import { AggregateError } from "./utils/aggregate-error.ts";

@@ -44,7 +44,7 @@ await build({
     target: 'ES2019',
   },
   mappings: {
-    "https://ghuc.cc/worker-tools/middleware@master/context.ts": {
+    "https://ghuc.cc/worker-tools/middleware/context.ts": {
       name: "@worker-tools/middleware",
       version: "latest",
     },

@@ -14,7 +14,7 @@ import { spy, assertSpyCall, assertSpyCalls } from "https://deno.land/std@0.133.
 const { test } = Deno;
 
 import { ok, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
-import { Context, createMiddleware } from "https://ghuc.cc/worker-tools/middleware@master/context.ts";
+import { Context, createMiddleware } from "https://ghuc.cc/worker-tools/middleware/context.ts";
 import { ResolvablePromise } from "https://ghuc.cc/worker-tools/resolvable-promise/index.ts";
 
 import { Awaitable, WorkerRouter } from '../index.ts';
