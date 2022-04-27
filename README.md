@@ -1,6 +1,12 @@
 # Worker Router
 A router for [Worker Environments](https://workers.js.org) such and Cloudflare Workers or Service Workers.
 
+***
+
+___Work In Progress___
+
+***
+
 This router is inspired by previous work such as `tiny-request-router` and `itty-router`, but it
 improves on them by providing better support for middleware, type inference, nested routing, and broader URL matching for use in service workers.
 
