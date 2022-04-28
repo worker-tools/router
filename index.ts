@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
+import { ResolvablePromise } from 'https://ghuc.cc/worker-tools/resolvable-promise/index.ts'
 
 import { AggregateError } from "./utils/aggregate-error.ts";
 // import { ErrorEvent } from './utils/error-event.ts';
@@ -93,12 +94,15 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
     // this.#opts = opts;
   }
 
-  async #route(fqURL: string, ctx: Omit<Context, 'effects'>): Promise<Response> {
+  async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
+    const handled = new ResolvablePromise<void>()
     try {
       if (!result) throw notFound();
       const [handler, match] = result;
-      return await handler(Object.assign(ctx, { match, effects: new EffectsList() }));
+      const response = await handler(Object.assign(ctx, { match, handled, effects: new EffectsList() }));
+      handled.resolve(ctx.event?.handled ?? Promise.resolve())
+      return response;
     }
     catch (err) {
       if (err instanceof Response) {
@@ -106,7 +110,9 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
         if (recoverResult) {
           try {
             const [handler, match] = recoverResult;
-            return await handler(Object.assign(ctx, { match, response: err, effects: new EffectsList() }));
+            const response = await handler(Object.assign(ctx, { match, response: err, handled, effects: new EffectsList() }));
+            handled.resolve(ctx.event?.handled ?? Promise.resolve())
+            return response;
           }
           catch (recoverErr) {
             throw new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')

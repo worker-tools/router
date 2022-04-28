@@ -81,7 +81,7 @@ test('handle', async () => {
     assert(req instanceof Request)
     assertEquals(req.method, 'GET')
     assertEquals(req.url, new URL('/', location.origin).href)
-    assertEquals(new Set(Object.keys(ctx!)), new Set(['request', 'match', 'effects', 'waitUntil']))
+    assertEquals(new Set(Object.keys(ctx!)), new Set(['request', 'match', 'effects', 'waitUntil', 'handled']))
     return ok();
   })
   await router.handle(new Request('/'))
