@@ -52,11 +52,15 @@ await build({
       name: "@worker-tools/response-creators",
       version: "latest",
     },
-    "https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts": {
-      name: "urlpattern-polyfill",
-      version: "^4.0.1",
-      subPath: 'dist/index.d.ts'
+    "https://ghuc.cc/worker-tools/resolvable-promise/index.ts": {
+      name: "@worker-tools/resolvable-promise",
+      version: "latest",
     },
+    // "https://ghuc.cc/kenchris/urlpattern-polyfill@69ac528/src/index.d.ts": {
+    //   name: "urlpattern-polyfill",
+    //   version: "^4.0.3",
+    //   subPath: 'dist/index.d.ts'
+    // },
   },
 });
 

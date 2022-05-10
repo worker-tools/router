@@ -3,11 +3,11 @@ import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-too
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
 import { ResolvablePromise } from 'https://ghuc.cc/worker-tools/resolvable-promise/index.ts'
 
+import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/worker-tools/middleware/context.ts'
+export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
+
 import { AggregateError } from "./utils/aggregate-error.ts";
 import { ErrorEvent } from './utils/error-event.ts';
-
-import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/kenchris/urlpattern-polyfill@a076337/src/index.d.ts';
-export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
 
 export type Awaitable<T> = T | PromiseLike<T>;
 
@@ -75,8 +75,7 @@ function toPattern(pathname: string) {
 }
 
 export interface WorkerRouterOptions {
-  /** @deprecated Might change name */
-  debug?: boolean
+  fatal?: boolean
 }
 
 // const anyResult = Object.freeze(toPattern('*').exec(new Request('/').url)!);
@@ -86,12 +85,16 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   #middleware: Middleware<RouteContext, RX>
   #routes: Route[] = [];
   #recoverRoutes: Route[] = [];
-  #opts: WorkerRouterOptions;
+  #fatal: boolean
 
   constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX, opts: WorkerRouterOptions = {}) {
     super();
     this.#middleware = middleware;
-    this.#opts = opts;
+    this.#fatal = opts?.fatal ?? false;
+  }
+
+  get fatal() {
+    return this.#fatal;
   }
 
   async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled'>): Promise<Response> {
@@ -111,29 +114,31 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
         try {
           const [handler, match] = recoverResult;
           const [response, error] = err instanceof Response ? [err, undefined] : [internalServerError(), err];
-          return await handler(Object.assign(ctx, { match, handled, response, error, effects: new EffectsList() }));
+          return await handler(Object.assign(ctx, { response, error, match, handled, effects: new EffectsList() }));
         }
         catch (recoverErr) {
-          const aggregateErr = new AggregateError([err, recoverErr], 'Route handler as well as recover handler failed')
-          if (this.#opts.debug) throw aggregateErr
+          const aggregateErr = new AggregateError([err, recoverErr], 'Route handler and recover handler failed')
+          if (this.#fatal) throw aggregateErr;
+          this.#fireError(aggregateErr);
           if (recoverErr instanceof Response) return recoverErr;
           if (err instanceof Response) return err;
-          this.#fireError(aggregateErr);
           return internalServerError();
         }
       }
-      if (this.#opts.debug) throw err
-      if (err instanceof Response) return err
+      if (this.#fatal) throw err;
       this.#fireError(err);
+      if (err instanceof Response) return err;
       return internalServerError();
     }
   }
 
   #fireError(error: unknown) {
-    self.dispatchEvent(new ErrorEvent('error', {
-      error,
-      message: error instanceof Error ? error.message : undefined,
-    }));
+    const message = error instanceof Response 
+      ? `${error.status} ${error.statusText}` 
+      : error instanceof Error 
+        ? error.message 
+        : 'Unknown error in router handler';
+    self.dispatchEvent(new ErrorEvent('error', { message, error }));
   }
 
   #execPatterns(fqURL: string, request: Request, routes = this.#routes): readonly [RouteHandler, URLPatternResult] | null {
@@ -401,9 +406,9 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
    * @deprecated The name of this method might change to avoid confusion with `use` method known from other routers.
    */
   use<Y extends RouteContext>(path: string, subRouter: WorkerRouter<Y>): this {
-    if (this.#opts.debug && !path.endsWith('*')) {
-      console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-    }
+    // if (this..fatal && !path.endsWith('*')) {
+    //   console.warn('Path for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    // }
 
     this.#routes.push({
       method: 'ANY',
@@ -420,9 +425,10 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   useExternal<Y extends RouteContext>(init: string | URLPatternInit, subRouter: WorkerRouter<Y>): this {
     const pattern = new URLPattern(init)
 
-    if (this.#opts.debug && !pattern.pathname.endsWith('*')) {
-      console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
-    }
+    // if (this.#opts.fatal && !pattern.pathname.endsWith('*')) {
+    //   console.warn('Pathname pattern for \'use\' does not appear to end in a wildcard (*). This is likely to produce unexpected results.');
+    // }
+
     this.#routes.push({
       method: 'ANY',
       pattern,
