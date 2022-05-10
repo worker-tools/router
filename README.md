@@ -81,8 +81,8 @@ Worker Router has first class support for error handling. Its main purpose is to
 const router = new WorkersRouter()
   .get('/', () => ok('Main Page'))
   .get('/about', () => { throw Error('bang') })
-  .recover('*', (req, { response }) => 
-    new Response(`Something went wrong`, response)
+  .recover('*', (req, { error, response }) => 
+    new Response(`Something went wrong: ${error.message}`, response)
   );
 ```
 
