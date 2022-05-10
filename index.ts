@@ -96,12 +96,13 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
 
   async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
-    const handled = new ResolvablePromise<void>()
+    const handledResolver = new ResolvablePromise<void>()
+    const handled = Promise.resolve(handledResolver);
     try {
       if (!result) throw notFound();
       const [handler, match] = result;
       const response = await handler(Object.assign(ctx, { match, handled, effects: new EffectsList() }));
-      handled.resolve(ctx.event?.handled ?? Promise.resolve())
+      handledResolver.resolve(ctx.event?.handled ?? Promise.resolve())
       return response;
     }
     catch (err) {
@@ -110,8 +111,8 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> /* extends Eve
         if (recoverResult) {
           try {
             const [handler, match] = recoverResult;
-            const response = await handler(Object.assign(ctx, { match, response: err, handled, effects: new EffectsList() }));
-            handled.resolve(ctx.event?.handled ?? Promise.resolve())
+            const response = await handler(Object.assign(ctx, { match, handled, response: err, effects: new EffectsList() }));
+            handledResolver.resolve(ctx.event?.handled ?? Promise.resolve())
             return response;
           }
           catch (recoverErr) {
