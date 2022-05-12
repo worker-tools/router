@@ -137,8 +137,8 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       ? `${error.status} ${error.statusText}` 
       : error instanceof Error 
         ? error.message 
-        : 'Unknown error in router handler';
-    self.dispatchEvent(new ErrorEvent('error', { message, error }));
+        : '' + error;
+    this.dispatchEvent(new ErrorEvent('error', { message, error }));
   }
 
   #execPatterns(fqURL: string, request: Request, routes = this.#routes): readonly [RouteHandler, URLPatternResult] | null {

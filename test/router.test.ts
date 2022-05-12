@@ -295,3 +295,16 @@ test('serve callback', async () => {
   assertStrictEquals(await router.serveCallback(new Request('/'), {}), theResponse)
   assertSpyCalls(callback, 1)
 })
+
+test('fires event in non-fatal mode', async () => {
+  const router = new WorkerRouter(_ => _, { fatal: false })
+  router.get('/', () => { throw Error('foobar') })
+  const callback = spy((e: ErrorEvent) => { 
+    assertExists(e) 
+    assert(e instanceof ErrorEvent) 
+    assert(e.message === 'foobar') 
+  })
+  router.addEventListener('error', callback)
+  await router.handle(new Request('/'));
+  assertSpyCalls(callback, 1)
+})
