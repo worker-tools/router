@@ -1,5 +1,5 @@
 # Worker Router
-A router for [Worker Environments](https://workers.js.org) such and Cloudflare Workers or Service Workers.
+A router for [Worker Runtimes](https://workers.js.org) such as Cloudflare Workers and Service Workers.
 
 ***
 
@@ -7,7 +7,7 @@ __Work In Progress__
 
 ***
 
-This router is inspired by previous work such as `tiny-request-router` and `itty-router`, but it
+This router is inspired by previous work, specifically `tiny-request-router` and `itty-router`, but it
 improves on them by providing better support for middleware, type inference, nested routing, and broader URL matching for use in service workers.
 
 ## 🆓 Type Inference
@@ -15,14 +15,14 @@ The goal of Worker Router is to *infer types based on usage* so that **no explic
 This allows even JavaScript users to benefit from inline documentation and API discoverability. For example,
 
 ```js
-const router = new WorkersRouter(basics())
-  .get('/about', (req, { userAgent }) => ok())
-  .get('/login', unsignedCookies(), (req, { userAgent, cookies }) => ok())
+const router = new WorkersRouter()
+  .get('/about', basics(), (req, { userAgent }) => ok())
+  .get('/login', unsignedCookies(), (req, { cookies }) => ok())
 ```
 
 In this example your editor can infer the types and documentation for
-  - `userAgent`, provided by the `basics` middleware for the entire router
-  - `cookies`, provided by the `unsignedCookies` middleware for this route only
+  - `userAgent`, provided by the `basics` middleware 
+  - `cookies`, provided by the `unsignedCookies` middleware 
 
 
 ## 🔋 Functional Middleware
@@ -58,7 +58,6 @@ const router = new WorkersRouter()
   .use('/item*', itemRouter)
 ```
 
-TODO: Provide parent matches to child router...
 
 ## ⚙️ Ready for Service... Worker
 Internally, this router uses [`URLPattern`](https://web.dev/urlpattern/) for routing, which allows it match URLs in the broadest sense. 
@@ -87,7 +86,7 @@ const router = new WorkersRouter()
 ```
 
 ## ✅ Works with Workers
-Worker Router comes with out of the box support for a variety of Worker Environments:
+Worker Router comes with out of the box support for a variety of Worker Runtimes:
 
 To use it in an environment that provides a global `fetch` event, use
 

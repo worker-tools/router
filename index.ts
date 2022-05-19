@@ -56,7 +56,7 @@ interface Route {
 }
 
 /** 
- * Turns a pathname pattern into a `URLPattern` that works across worker environments.
+ * Turns a pathname pattern into a `URLPattern` that works across worker runtimes.
  * 
  * Specifically in the case of Service Workers, this ensures requests to external domains that happen to have the same
  * pathname aren't matched. 
@@ -105,7 +105,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
       if (!result) throw notFound();
       const [handler, match] = result;
       const response = await handler(Object.assign(ctx, { match, handled, effects: new EffectsList() }));
-      handledResolver.resolve(ctx.event?.handled ?? Promise.resolve())
+      handledResolver.resolve(ctx.event?.handled)
       return response;
     }
     catch (err) {
