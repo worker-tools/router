@@ -1,12 +1,6 @@
 # Worker Router
 A router for [Worker Runtimes](https://workers.js.org) such as Cloudflare Workers and Service Workers.
 
-***
-
-__Work In Progress__
-
-***
-
 This router is inspired by previous work, specifically `tiny-request-router` and `itty-router`, but it
 improves on them by providing better support for middleware, type inference, nested routing, and broader URL matching for use in service workers.
 
@@ -26,7 +20,8 @@ In this example your editor can infer the types and documentation for
 
 
 ## 🔋 Functional Middleware
-Worker Router middlewares are *just function* that add properties to a generic context object. As such, they can be *mixed and matched* using standard tools from functional programming.
+Worker Router [middlewares](https://workers.tools/middleware) are *just function* that add properties to a generic context object. 
+As such, they can be *mixed and matched* using standard tools from functional programming.
 
 For convenience, this module provides a `combine` utility to combine multiple middlewares into one.
 
