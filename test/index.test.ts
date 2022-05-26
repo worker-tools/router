@@ -13,11 +13,11 @@ import {
 import { spy, assertSpyCall, assertSpyCalls } from "https://deno.land/std@0.133.0/testing/mock.ts";
 const { test } = Deno;
 
+import { createMiddleware } from "https://ghuc.cc/worker-tools/middleware/context.ts";
 import { ok, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
-import { Context, createMiddleware } from "https://ghuc.cc/worker-tools/middleware/context.ts";
 import { ResolvablePromise } from "https://ghuc.cc/worker-tools/resolvable-promise/index.ts";
 
-import { Awaitable, WorkerRouter } from '../index.ts';
+import { WorkerRouter } from '../index.ts';
 
 const location = {
   origin: 'http://localhost:12334',
@@ -38,7 +38,7 @@ test('request', () => {
 })
 
 test('routes', async () => {
-  const router = new WorkerRouter();
+  const router = new WorkerRouter(x => x, { fatal: true });
 
   const getCallback = spy(() => ok())
   const postCallback = spy(() => ok())
@@ -77,14 +77,21 @@ test('routes', async () => {
 })
 
 test('handle', async () => {
-  const router = new WorkerRouter().get('/', (req, ctx) => {
-    assert(req instanceof Request)
-    assertEquals(req.method, 'GET')
-    assertEquals(req.url, new URL('/', location.origin).href)
-    assertEquals(new Set(Object.keys(ctx!)), new Set(['request', 'match', 'effects', 'waitUntil', 'handled']))
-    return ok();
-  })
+  let i = 0
+  const router = new WorkerRouter(x => x, { fatal: true })
+    .get('/', (req, ctx) => {
+      i++;
+      assert(req instanceof Request)
+      assertEquals(req.method, 'GET')
+      assertEquals(req.url, new URL('/', location.origin).href)
+      assertEquals(
+        new Set(Object.keys(ctx!)), 
+        new Set(['request', 'waitUntil', 'match', 'handled', 'closed', 'effects' ]),
+      )
+      return ok();
+    })
   await router.handle(new Request('/'))
+  assertEquals(i, 1, 'called')
 })
 
 test('all methods', async () => {
@@ -92,7 +99,7 @@ test('all methods', async () => {
     assert(req instanceof Request)
     return ok();
   })
-  const router = new WorkerRouter().all('/', callback)
+  const router = new WorkerRouter(x => x, { fatal: true }).all('/', callback)
   await Promise.all([
     router.handle(new Request('/', { method: 'POST' })),
     router.handle(new Request('/', { method: 'PUT' })),
@@ -106,7 +113,7 @@ test('all methods', async () => {
 
 test('patterns', async () => {
   let called = false
-  const router = new WorkerRouter().get('/item/:id', (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('/item/:id', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/3')
     assertEquals(ctx.match.pathname.groups, { id: '3' })
@@ -119,7 +126,7 @@ test('patterns', async () => {
 
 test('error recovery', async () => {
   let called = false
-  const router = new WorkerRouter()
+  const router = new WorkerRouter(x => x, { fatal: true })
     .get('/item/:id', () => { throw new Response(null, { status: 418 }) })
     .recover('*', (req, { response }) => {
       called = true;
@@ -132,7 +139,7 @@ test('error recovery', async () => {
 
 test('multi patterns', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/item/:type/:id', (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('/item/:type/:id', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/soap/3')
     assertEquals(ctx.match.pathname.groups, { type: 'soap', id: '3' })
@@ -145,7 +152,7 @@ test('multi patterns', async () => {
 
 test('wildcards *', async () => {
   let called = false;
-  const router = new WorkerRouter().get('*', (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('*', (req, ctx) => {
     assertExists(ctx.match)
     assertEquals(ctx.match.pathname.input, '/item/soap/3')
     assertEquals(ctx.match.pathname.groups, { 0: '/item/soap/3' })
@@ -158,7 +165,7 @@ test('wildcards *', async () => {
 
 test('wildcards /*', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/*', (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('/*', (req, ctx) => {
     assertEquals(ctx.match.pathname.groups, { 0: 'item/soap/3' })
     called = true;
     return ok();
@@ -169,7 +176,7 @@ test('wildcards /*', async () => {
 
 test('ignores search params and hashes', async () => {
   let called = false;
-  const router = new WorkerRouter().get('/item/soap/:id', (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('/item/soap/:id', (req, ctx) => {
     assertEquals(ctx.match.pathname.groups['id'], '3')
     called = true;
     return ok();
@@ -181,7 +188,7 @@ test('ignores search params and hashes', async () => {
 test('middleware', async () => {
   let called = false;
   const mw = createMiddleware(() => ({ foo: '' }), async x => ({ ...await x, foo: 'bar' }))
-  const router = new WorkerRouter().get('/', mw, (req, ctx) => {
+  const router = new WorkerRouter(x => x, { fatal: true }).get('/', mw, (req, ctx) => {
     assertEquals(ctx.foo, 'bar')
     called = true;
     return ok();
@@ -192,13 +199,13 @@ test('middleware', async () => {
 })
 
 test('delegation', async () => {
-  const itemRouter = new WorkerRouter()
+  const itemRouter = new WorkerRouter(x => x, { fatal: true })
     .get('/:type/:id', (req, ctx) => {
       assertEquals(ctx.match.pathname.groups, { type: 'soap', id: '3' })
       return ok()
     })
 
-  const router = new WorkerRouter()
+  const router = new WorkerRouter(x => x, { fatal: true })
     .use('/(item|sale)/*', itemRouter)
 
   await Promise.all([
@@ -210,7 +217,7 @@ test('delegation', async () => {
 test('external resources', async () => {
   const callback = spy(() => ok())
 
-  const router = new WorkerRouter()
+  const router = new WorkerRouter(x => x, { fatal: true })
     .external('https://exmaple.com/*', callback)
     .any('*', () => notFound())
 
@@ -230,7 +237,7 @@ test('external resources', async () => {
 test('pattern init', async () => {
   const callback = spy(() => ok())
 
-  const router = new WorkerRouter()
+  const router = new WorkerRouter(x => x, { fatal: true })
     .external({ pathname: '/api/*', baseURL: 'https://example.com' }, callback)
 
   await router.handle(new Request('https://example.com/api/call'))
@@ -254,10 +261,10 @@ test('pattern init', async () => {
 // })
 
 test('fetch event listener', async () => {
-  const rp = new ResolvablePromise()
-  const theResponse = ok();
-  const callback = spy(() => theResponse)
-  const router = new WorkerRouter()
+  const rp = new ResolvablePromise<Response>()
+  const theResponse = ok('ok');
+  const callback = spy(() => theResponse.clone())
+  const router = new WorkerRouter(x => x, { fatal: true })
     .any('*', callback)
 
   router.handleEvent(new class extends Event {
@@ -270,34 +277,37 @@ test('fetch event listener', async () => {
     }
     waitUntil() {}
   })
-  assertStrictEquals(await rp, theResponse);
+  await rp;
+  assertEquals((await rp).text(), theResponse.text());
   assertSpyCalls(callback, 1)
 })
 
 test('module fetch export', async () => {
   const theEnv = {}
   const envCtx = { waitUntil() {} }
-  const theResponse = ok();
-  const router = new WorkerRouter()
+  const theResponse = ok('ok');
+  const router = new WorkerRouter(x => x, { fatal: true })
     .any('*', (req, { env, waitUntil }) => {
       assertExists(waitUntil)
       assertStrictEquals(env, theEnv)
-      return theResponse;
+      return theResponse.clone();
     })
-  assertEquals(await router.fetch(new Request('/'), theEnv, envCtx), theResponse)
+  const res = await router.fetch(new Request('/'), theEnv, envCtx)
+  assertEquals(await res.text(), await theResponse.text())
 })
 
 test('serve callback', async () => {
-  const theResponse = ok();
-  const callback = spy(() => theResponse)
-  const router = new WorkerRouter()
+  const theResponse = ok('ok');
+  const callback = spy(() => theResponse.clone())
+  const router = new WorkerRouter(x => x, { fatal: true })
     .any('*', callback)
-  assertStrictEquals(await router.serveCallback(new Request('/'), {}), theResponse)
+  const res = await router.serveCallback(new Request('/'), {})
+  assertStrictEquals(await res.text(), await theResponse.text())
   assertSpyCalls(callback, 1)
 })
 
 test('fires event in non-fatal mode', async () => {
-  const router = new WorkerRouter(_ => _, { fatal: false })
+  const router = new WorkerRouter(x => x, { fatal: false })
   router.get('/', () => { throw Error('foobar') })
   const callback = spy((e: ErrorEvent) => { 
     assertExists(e) 

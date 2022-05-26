@@ -1,7 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
+import { Context, EffectsList, executeEffects, closedResponse, providePromises } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
-import { ResolvablePromise } from 'https://ghuc.cc/worker-tools/resolvable-promise/index.ts'
 
 import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/worker-tools/middleware/context.ts'
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
@@ -42,7 +41,6 @@ export type Handler<X extends RouteContext> = (request: Request, ctx: X) => Awai
 export type ErrorHandler<X extends ErrorContext> = (request: Request, ctx: X) => Awaitable<Response>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-
 
 // Internal types...  these are not the types you are looking for
 type MethodWildcard = 'ANY';
@@ -97,15 +95,15 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
     return this.#fatal;
   }
 
-  async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled'>): Promise<Response> {
+  async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled' | 'closed'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
-    const handledResolver = new ResolvablePromise<void>()
-    const handled = Promise.resolve(handledResolver);
     try {
       if (!result) throw notFound();
       const [handler, match] = result;
-      const response = await handler(Object.assign(ctx, { match, handled, effects: new EffectsList() }));
-      handledResolver.resolve(ctx.event?.handled)
+      const [ps, rs] = providePromises()
+      const userCtx = Object.assign(ctx, { match, ...ps, effects: new EffectsList() })
+      const response = closedResponse(rs.close, await handler(userCtx))
+      rs.handle.resolve(ctx.event?.handled?.then(() => response) ?? response)
       return response;
     }
     catch (err) {
@@ -114,7 +112,11 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
         try {
           const [handler, match] = recoverResult;
           const [response, error] = err instanceof Response ? [err, undefined] : [internalServerError(), err];
-          return await handler(Object.assign(ctx, { response, error, match, handled, effects: new EffectsList() }));
+          const [ps, rs] = providePromises()
+          const userCtx = Object.assign(ctx, { response, error, match, ...ps, effects: new EffectsList() })
+          const res = closedResponse(rs.close, await handler(userCtx));
+          rs.handle.resolve(ctx.event?.handled?.then(() => res) ?? res)
+          return res;
         }
         catch (recoverErr) {
           const aggregateErr = new AggregateError([err, recoverErr], 'Route handler and recover handler failed')
@@ -524,7 +526,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   // Provide types for error handler:
   addEventListener(
     type: 'error', 
-    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    listener: TypedEventListenerOrEventListenerObject<ErrorEvent> | null,
     options?: boolean | AddEventListenerOptions,
   ): void;
   addEventListener(...args: Parameters<EventTarget['addEventListener']>) {
@@ -533,7 +535,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
 
   removeEventListener(
     type: 'error', 
-    listener: GenericEventListenerOrEventListenerObject<ErrorEvent> | null,
+    listener: TypedEventListenerOrEventListenerObject<ErrorEvent> | null,
     options?: EventListenerOptions | boolean,
   ): void;
   removeEventListener(...args: Parameters<EventTarget['removeEventListener']>) {
@@ -541,8 +543,6 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   }
 }
 
-// Helper types
-type GenericEventListener<E extends Event> = (evt: E) => void | Promise<void>;
-type GenericEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
-type GenericEventListenerOrEventListenerObject<E extends Event> = GenericEventListener<E> | GenericEventListenerObject<E>;
-
+type TypedEventListener<E extends Event> = (evt: E) => void | Promise<void>;
+type TypedEventListenerObject<E extends Event> = { handleEvent(evt: E): void | Promise<void>; }
+type TypedEventListenerOrEventListenerObject<E extends Event> = TypedEventListener<E> | TypedEventListenerObject<E>;
