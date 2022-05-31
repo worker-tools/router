@@ -28,7 +28,7 @@ await build({
     "https://ghuc.cc/worker-tools/middleware/context.ts": {
       name: "@worker-tools/middleware",
       version: "latest",
-      subPath: 'context',
+      // subPath: 'context', // most node tooling doesn't respect exports, so why bother...
     },
     "https://ghuc.cc/worker-tools/response-creators/index.ts": {
       name: "@worker-tools/response-creators",
