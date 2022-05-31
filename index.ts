@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-import { Context, EffectsList, executeEffects, closedResponse, providePromises } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
+import { Context, EffectsList, executeEffects } from 'https://ghuc.cc/worker-tools/middleware/context.ts';
 import { internalServerError, notFound } from 'https://ghuc.cc/worker-tools/response-creators/index.ts';
+import { ResolvablePromise } from 'https://ghuc.cc/worker-tools/resolvable-promise/index.ts';
 
 import type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult } from 'https://ghuc.cc/worker-tools/middleware/context.ts'
 export type { URLPatternInit, URLPatternComponentResult, URLPatternInput, URLPatternResult }
@@ -95,15 +96,16 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
     return this.#fatal;
   }
 
-  async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled' | 'closed'>): Promise<Response> {
+  async #route(fqURL: string, ctx: Omit<Context, 'effects' | 'handled'>): Promise<Response> {
     const result = this.#execPatterns(fqURL, ctx.request)
     try {
       if (!result) throw notFound();
       const [handler, match] = result;
-      const [ps, rs] = providePromises()
-      const userCtx = Object.assign(ctx, { match, ...ps, effects: new EffectsList() })
-      const response = closedResponse(rs.close, await handler(userCtx))
-      rs.handle.resolve(ctx.event?.handled?.then(() => response) ?? response)
+      const handle = new ResolvablePromise<Response>()
+      const handled = Promise.resolve(handle)
+      const userCtx = Object.assign(ctx, { match, handled, effects: new EffectsList() })
+      const response = await handler(userCtx)
+      handle.resolve(ctx.event?.handled?.then(() => response) ?? response)
       return response;
     }
     catch (err) {
@@ -112,10 +114,11 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
         try {
           const [handler, match] = recoverResult;
           const [response, error] = err instanceof Response ? [err, undefined] : [internalServerError(), err];
-          const [ps, rs] = providePromises()
-          const userCtx = Object.assign(ctx, { response, error, match, ...ps, effects: new EffectsList() })
-          const res = closedResponse(rs.close, await handler(userCtx));
-          rs.handle.resolve(ctx.event?.handled?.then(() => res) ?? res)
+          const handle = new ResolvablePromise<Response>()
+          const handled = Promise.resolve(handle)
+          const userCtx = Object.assign(ctx, { response, error, match, handled, effects: new EffectsList() })
+          const res = await handler(userCtx);
+          handle.resolve(ctx.event?.handled?.then(() => res) ?? res)
           return res;
         }
         catch (recoverErr) {

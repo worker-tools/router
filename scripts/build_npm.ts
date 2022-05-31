@@ -34,10 +34,10 @@ await build({
       name: "@worker-tools/response-creators",
       version: "latest",
     },
-    // "https://ghuc.cc/worker-tools/resolvable-promise/index.ts": {
-    //   name: "@worker-tools/resolvable-promise",
-    //   version: "latest",
-    // },
+    "https://ghuc.cc/worker-tools/resolvable-promise/index.ts": {
+      name: "@worker-tools/resolvable-promise",
+      version: "latest",
+    },
   },
 });
 

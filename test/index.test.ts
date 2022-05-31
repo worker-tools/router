@@ -86,7 +86,7 @@ test('handle', async () => {
       assertEquals(req.url, new URL('/', location.origin).href)
       assertEquals(
         new Set(Object.keys(ctx!)), 
-        new Set(['request', 'waitUntil', 'match', 'handled', 'closed', 'effects' ]),
+        new Set(['request', 'waitUntil', 'match', 'handled', 'effects' ]),
       )
       return ok();
     })
