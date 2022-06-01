@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=./,/Users/qwtel/Library/Caches/deno --allow-net --allow-env=HOME,DENO_AUTH_TOKENS,DENO_DIR --allow-run=git,pnpm
 
-import { basename, extname } from "https://deno.land/std@0.133.0/path/mod.ts";
-import { build, emptyDir } from "https://deno.land/x/dnt/mod.ts";
+import { basename } from "https://deno.land/std@0.133.0/path/mod.ts";
+import { build, emptyDir } from "https://deno.land/x/dnt@0.24.0/mod.ts";
 
 import { 
   copyMdFiles, mkPackage,
@@ -21,6 +21,7 @@ await build({
   declaration: true,
   packageManager: 'pnpm',
   compilerOptions: {
+    lib: ["lib.es2021.d.ts", "lib.webworker.d.ts", "lib.webworker.iterable.d.ts"],
     sourceMap: true,
     target: 'ES2019',
   },
