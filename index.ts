@@ -62,16 +62,18 @@ interface Route {
  * If a worker environment has a location set (e.g. deno with `--location` or CF workers with a location polyfill), 
  * this is essentially a noop since only matching requests can reach deployed workers in the first place.
  */
-function toPattern(pathname: string) {
-  const pattern = new URLPattern({
-    pathname,
-    protocol: self.location?.protocol,
-    hostname: self.location?.hostname,
-    port: self.location?.port,
-  })
-  // Note that `undefined` becomes a `*` pattern.
-  return pattern;
-}
+const toPattern = self.location?.hostname === 'localhost'
+  ? (pathname: string) => new URLPattern({ pathname })
+  : (pathname: string) => {
+    const pattern = new URLPattern({
+      pathname,
+      protocol: self.location?.protocol,
+      hostname: self.location?.hostname,
+      port: self.location?.port,
+    })
+    // Note that `undefined` becomes a `*` pattern.
+    return pattern;
+  }
 
 export interface WorkerRouterOptions {
   fatal?: boolean
@@ -138,10 +140,10 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   }
 
   #fireError(error: unknown) {
-    const message = error instanceof Response 
-      ? `${error.status} ${error.statusText}` 
-      : error instanceof Error 
-        ? error.message 
+    const message = error instanceof Response
+      ? `${error.status} ${error.statusText}`
+      : error instanceof Error
+        ? error.message
         : '' + error;
     this.dispatchEvent(new ErrorEvent('error', { message, error }));
   }
@@ -528,7 +530,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
 
   // Provide types for error handler:
   addEventListener(
-    type: 'error', 
+    type: 'error',
     listener: TypedEventListenerOrEventListenerObject<ErrorEvent> | null,
     options?: boolean | AddEventListenerOptions,
   ): void;
@@ -537,7 +539,7 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   }
 
   removeEventListener(
-    type: 'error', 
+    type: 'error',
     listener: TypedEventListenerOrEventListenerObject<ErrorEvent> | null,
     options?: EventListenerOptions | boolean,
   ): void;
