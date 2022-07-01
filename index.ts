@@ -62,7 +62,7 @@ interface Route {
  * If a worker environment has a location set (e.g. deno with `--location` or CF workers with a location polyfill), 
  * this is essentially a noop since only matching requests can reach deployed workers in the first place.
  */
-const toPattern = self.location?.hostname === 'localhost'
+const toPattern = navigator.userAgent?.includes('Cloudflare-Workers') && self.location?.hostname === 'localhost'
   ? (pathname: string) => new URLPattern({ pathname })
   : (pathname: string) => {
     const pattern = new URLPattern({
@@ -88,9 +88,9 @@ export class WorkerRouter<RX extends RouteContext = RouteContext> extends EventT
   #recoverRoutes: Route[] = [];
   #fatal: boolean
 
-  constructor(middleware: Middleware<RouteContext, RX> = _ => _ as RX, opts: WorkerRouterOptions = {}) {
+  constructor(middleware?: Middleware<RouteContext, RX> | null, opts: WorkerRouterOptions = {}) {
     super();
-    this.#middleware = middleware;
+    this.#middleware = middleware ?? (_ => _ as RX);
     this.#fatal = opts?.fatal ?? false;
   }
 
