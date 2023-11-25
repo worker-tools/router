@@ -9,7 +9,7 @@ The goal of Worker Router is to *infer types based on usage* so that **no explic
 This allows even JavaScript users to benefit from inline documentation and API discoverability. For example,
 
 ```js
-const router = new WorkersRouter()
+const router = new WorkerRouter()
   .get('/about', basics(), (req, { userAgent }) => ok())
   .get('/login', unsignedCookies(), (req, { cookies }) => ok())
 ```
@@ -32,7 +32,7 @@ const myReusableMW = combine(
   cookieSession({ user: '' })
 );
 
-const router = new WorkersRouter()
+const router = new WorkerRouter()
   .get('/', myReusableMW, () => ok())
   .post('/', combine(myReusableMW, bodyParser()), () => ok())
 ```
@@ -48,7 +48,7 @@ const itemRouter = new WorkerRouter()
   .get('/', (req, { params }) => ok(`Matched "/item/`))
   .get('/:id', (req, { params }) => ok(`Matched "/item/${params.id}`))
 
-const router = new WorkersRouter()
+const router = new WorkerRouter()
   .get('/', () => ok('Main Page'))
   .use('/item*', itemRouter)
 ```
@@ -60,7 +60,7 @@ For example, the following router, meant to be used in a Service Worker, can han
 
 ```js
 // file: "sw.js"
-const router = new WorkersRouter()
+const router = new WorkerRouter()
   .get('/', () => ok('Main Page'))
   .get('/about', () => ok('About Page'))
   .external('https://plausible.io/api/*', req => {
@@ -72,7 +72,7 @@ const router = new WorkersRouter()
 Worker Router has first class support for error handling. Its main purpose is to let you write your handlers without having to wrap everything inside a massive `try {} catch` block. Instead, you can define special recover routes that get invoked when something goes wrong. 
 
 ```js
-const router = new WorkersRouter()
+const router = new WorkerRouter()
   .get('/', () => ok('Main Page'))
   .get('/about', () => { throw Error('bang') })
   .recover('*', (req, { error, response }) => 
